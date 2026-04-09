@@ -28,7 +28,7 @@ import {
 } from "@src/databases/auth/permissions";
 import type { Role, User } from "@src/databases/auth/types";
 import { PermissionAction, PermissionType } from "@src/databases/auth/types";
-import type { DatabaseId, ISODateString } from "@src/content/types";
+import type { DatabaseId } from "@src/content/types";
 
 // Mock roles that would be in database
 const mockRoles: Role[] = [
@@ -84,8 +84,6 @@ describe("Role and Permission Access Management", () => {
       email: "editor@example.com",
       role: "editor",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     // Editor can create and read content
@@ -106,8 +104,6 @@ describe("Role and Permission Access Management", () => {
       email: "admin@example.com",
       role: "admin",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     // Admin should have all permissions regardless of what's in permissions array
@@ -139,8 +135,6 @@ describe("Role and Permission Access Management", () => {
       email: "editor@example.com",
       role: "editor",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     const canCreate = hasPermissionByAction(
@@ -168,8 +162,6 @@ describe("Role and Permission Access Management", () => {
       email: "admin@example.com",
       role: "admin",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     const editorUser: User = {
@@ -177,8 +169,6 @@ describe("Role and Permission Access Management", () => {
       email: "editor@example.com",
       role: "editor",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     expect(isAdminRoleWithRoles(adminUser.role, mockRoles)).toBe(true);
@@ -191,8 +181,6 @@ describe("Role and Permission Access Management", () => {
       email: "viewer@example.com",
       role: "viewer",
       permissions: [],
-      createdAt: "2024-01-01T00:00:00Z" as ISODateString,
-      updatedAt: "2024-01-01T00:00:00Z" as ISODateString,
     };
 
     // Viewer can read

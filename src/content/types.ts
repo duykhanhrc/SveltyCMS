@@ -188,27 +188,14 @@ export interface FieldInstance {
 
   // Field properties
   label: string;
-  modifyRequest?: (args: {
-    collection: unknown;
-    field: FieldInstance;
-    data: any;
-    user: unknown;
-    type: string;
-    tenantId?: DatabaseId | null;
-    collectionName?: string;
-    skipValidation?: boolean;
-    action?: string;
-  }) => Promise<void>;
+  modifyRequest?: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
   modifyRequestBatch?: (args: {
     data: Record<string, unknown>[];
     collection: unknown;
-    field: FieldInstance;
+    field: unknown;
     user: unknown;
     type: string;
     tenantId?: DatabaseId | null;
-    collectionName?: string;
-    skipValidation?: boolean;
-    action?: string;
   }) => Promise<Record<string, unknown>[]>;
 
   // Permissions: access control for this field (AUTH tab). Stored in widget.permissions.
@@ -515,20 +502,7 @@ export interface TablePaginationProps {
 }
 
 /* AUTOGEN_START: ContentTypes */
-export type ContentTypes = "Authors" | "Categories" | "Posts" | "test_posts" | (string & {});
+export type ContentTypes = string & {};
 
-export interface CollectionMap {
-  Authors: { name: string; email: string; bio: string; avatar: string };
-  Categories: { name: string; slug: string; description: string };
-  Posts: {
-    title: string;
-    slug: string;
-    author: string;
-    categories: string;
-    publishedDate: ISODateString;
-    content: string;
-    seo: string;
-  };
-  test_posts: { Title: string; Content: string; Status: string };
-}
+export interface CollectionMap {}
 /* AUTOGEN_END: ContentTypes */

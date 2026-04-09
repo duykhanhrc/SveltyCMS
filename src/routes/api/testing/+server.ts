@@ -15,36 +15,29 @@ function checkTestMode(event: RequestEvent) {
   }
 
   const clientAddress = event.getClientAddress?.() || "";
-  const hostname = event.url.hostname;
   const isLocal =
     clientAddress === "127.0.0.1" ||
     clientAddress === "::1" ||
     clientAddress === "::ffff:127.0.0.1" ||
-    hostname === "localhost" ||
-    hostname === "127.0.0.1";
-
-  if (isLocal) {
-    // In TEST_MODE and Local, we allow access even without secret
-    // to simplify benchmarking and CI where secret injection might be flaky.
-    return;
-  }
-
+    event.url.hostname === "localhost" ||
+    event.url.hostname === "127.0.0.1";
   const testSecret = event.request.headers.get("x-test-secret");
   const masterSecret = process.env.TEST_API_SECRET;
 
-  if (!masterSecret || testSecret !== masterSecret) {
-    console.error(`[API/Testing] Forbidden non-local access attempt details:`, {
-      clientAddress,
-      hostname,
-      isLocal,
-      masterSecretSet: !!masterSecret,
-      testSecretSet: !!testSecret,
-      secretsMatch: testSecret === masterSecret,
-    });
+  if (!isLocal || !masterSecret || testSecret !== masterSecret) {
+    console.warn(`[API/Testing] Forbidden access: 
+			isLocal=${isLocal} (${clientAddress}), 
+			masterSecretSet=${!!masterSecret}, 
+			testSecretSet=${!!testSecret}, 
+			match=${testSecret === masterSecret}`);
 
-    throw new Error(
-      `FORBIDDEN: Unauthorized access attempt (Local: ${isLocal}, Match: ${testSecret === masterSecret})`,
-    );
+    if (testSecret !== masterSecret) {
+      console.warn(
+        `[API/Testing] Secret mismatch. Received: "${testSecret?.substring(0, 4)}...", Expected: "${masterSecret?.substring(0, 4)}..."`,
+      );
+    }
+
+    throw new Error("FORBIDDEN: Unauthorized access attempt");
   }
 }
 
@@ -112,13 +105,49 @@ export async function POST(event: RequestEvent) {
       );
     }
 
-    const { LocalCMS } = await import("@src/routes/api/cms");
-    const cms = new LocalCMS(currentDbAdapter);
-
     const body = await request.json();
     const action = body.action;
 
     switch (action) {
+      case "reset": {
+        await currentDbAdapter.clearDatabase();
+        // Invalidate setup cache so the server realizes the DB is now empty
+        const { invalidateSetupCache } = await import("@src/utils/setup-check");
+        invalidateSetupCache(true, false); // forceStatus = false (Setup NOT complete)
+
+        // Clear all session caches to prevent session bleed
+        const { clearAllSessionCaches } = await import("@src/hooks/handle-authentication");
+        await clearAllSessionCaches();
+
+        // Wipe uploaded media files from tests
+        try {
+          const { getPublicSetting } = await import("@src/services/settings-service");
+          const fs = await import("node:fs");
+          const fsp = await import("node:fs/promises");
+          const path = await import("node:path");
+          const mediaFolderPath = (await getPublicSetting("MEDIA_FOLDER")) || "mediaFolder";
+          const fullPath = path.resolve(process.cwd(), mediaFolderPath);
+
+          // Recursively empty the folder rather than deleting it completely to avoid EBUSY on Windows
+          if (fs.existsSync(fullPath)) {
+            const items = await fsp.readdir(fullPath);
+            for (const item of items) {
+              await fsp.rm(path.join(fullPath, item), {
+                recursive: true,
+                force: true,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[API/Testing] Non-fatal error cleaning media folder:", e);
+        }
+
+        return json({
+          success: true,
+          message: "Database cleared, caches invalidated, and media files wiped",
+        });
+      }
+
       case "invalidate-cache": {
         await invalidateUserCountCache();
         return json({ success: true, message: "User count cache invalidated" });
@@ -131,41 +160,11 @@ export async function POST(event: RequestEvent) {
 
       case "get-user": {
         const email = body.email;
-        const userResult = await cms.auth.login({ email });
-        return json({ success: true, user: userResult.user });
+        const userResult = await currentAuth.getUserByEmail({ email });
+        return json({ success: true, user: userResult });
       }
 
       case "seed": {
-        console.log("[TestingBridge] Seeding database...");
-
-        // SELF-HEALING: Ensure private.test.ts exists before seeding.
-        // This prevents 503 errors on subsequent requests after a hard-reset.
-        const { writePrivateConfig } = await import("@src/routes/setup/write-private-config");
-        const { invalidateSetupCache } = await import("@src/utils/setup-check");
-
-        const dbConfig = {
-          type: (process.env.DB_TYPE as any) || "sqlite",
-          host: process.env.DB_HOST || "127.0.0.1",
-          name: process.env.DB_NAME || "sveltycms_test",
-          user: process.env.DB_USER || "",
-          password: process.env.DB_PASSWORD || "",
-          port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined,
-        };
-
-        try {
-          await writePrivateConfig(dbConfig, {
-            multiTenant: process.env.MULTI_TENANT === "true",
-            demoMode: process.env.DEMO === "true",
-          });
-          invalidateSetupCache(true);
-          console.log("[TestingBridge] Private config restored for seeding.");
-        } catch (e) {
-          console.warn(
-            "[TestingBridge] Could not restore private config (might already exist):",
-            e,
-          );
-        }
-
         // Initialize default roles, settings and themes
         const { seedRoles, seedDefaultTheme, seedSettings, seedCollectionsForSetup } =
           await import("@src/routes/setup/seed");
@@ -178,22 +177,14 @@ export async function POST(event: RequestEvent) {
         await seedCollectionsForSetup(currentDbAdapter);
 
         // Seed Admin User
-        const adminEmail = body.email || "admin@example.com";
-        const adminPassword = body.password || "Password123!";
+        const adminEmail = body.email || "admin@test.com";
+        const adminPassword = body.password || "Test123!";
 
         // Check if already exists
-        let userResult;
-        try {
-          userResult = await cms.auth.login({ email: adminEmail });
-        } catch {
-          userResult = null;
-        }
-
+        const userResult = await currentAuth.getUserByEmail({
+          email: adminEmail,
+        });
         if (!userResult) {
-          // Note: LocalCMS doesn't have a direct 'createUser' that bypasses auth,
-          // so we use the adapter for the initial admin creation if needed,
-          // or we could use cms.auth.register if implemented.
-          // For now, adapter is fine for the admin SEED.
           await currentAuth.createUser({
             email: adminEmail,
             password: adminPassword,
@@ -208,14 +199,14 @@ export async function POST(event: RequestEvent) {
         const { invalidateSetupCache: invalidateAfterSeed } =
           await import("@src/utils/setup-check");
         invalidateAfterSeed(true);
+
         await invalidateUserCountCache();
 
-        console.log("[TestingBridge] Seeding complete. Admin created:", adminEmail);
-        return json({ success: true, message: "Database seeded and config restored" });
+        return json({ success: true, message: "Database seeded" });
       }
 
       case "create-user": {
-        const { email, password, username, role, isAdmin, tenantId } = body;
+        const { email, password, username, role, isAdmin } = body;
         if (!(email && password && role)) {
           return json({ error: "Missing fields" }, { status: 400 });
         }
@@ -226,178 +217,22 @@ export async function POST(event: RequestEvent) {
           role,
           isAdmin: isAdmin === true || role === "admin",
           isRegistered: true,
-          tenantId,
         });
-
         return json({
           success: true,
           user: { id: user._id, email: user.email, role: user.role },
         });
       }
 
-      case "create-collection": {
-        const { name, schema: partialSchema } = body;
-        if (!name || !partialSchema) {
-          return json({ error: "Missing name or schema" }, { status: 400 });
-        }
-
-        const { getCollectionFilePath } = await import("@utils/tenant-paths");
-        const { compile } = await import("@src/utils/compilation/compile");
-        const fs = await import("node:fs");
-
-        const tenantId = body.tenantId || event.locals.tenantId;
-        const collectionPath = getCollectionFilePath(name, tenantId);
-
-        const fieldsArray = partialSchema.fields || [];
-        const fieldsStr = JSON.stringify(fieldsArray, null, 2);
-
-        const content = [
-          "/**",
-          ` * @file ${name}.ts`,
-          " * @description Generated benchmark collection",
-          " */",
-          "import type { Schema } from '@src/content/types';",
-          "",
-          "export const schema: Schema = {",
-          partialSchema._id ? `  _id: "${partialSchema._id}",` : "",
-          `  name: "${name}",`,
-          `  icon: "${partialSchema.icon || "bi:file"}",`,
-          `  status: "${partialSchema.status || "publish"}",`,
-          `  slug: "${partialSchema.slug || name.toLowerCase()}",`,
-          `  fields: ${fieldsStr}`,
-          "};",
-        ]
-          .filter((line) => line !== "")
-          .join("\n");
-
-        const path = await import("node:path");
-        fs.mkdirSync(path.dirname(collectionPath), { recursive: true });
-        fs.writeFileSync(collectionPath, content);
-
-        // Compile and Refresh
-        await compile({ tenantId });
-
-        // Force a full reload that bypasses L2 cache to ensure the new file is scanned
-        const { scanAndProcessFiles, contentService } =
-          await import("@src/content/content-service.server");
-        const schemas = await scanAndProcessFiles();
-
-        await contentService.reconcile(schemas, tenantId, false, currentDbAdapter, true);
-
-        // --- SQL ADAPTER HARDENING: Ensure physical tables are created IMMEDIATELY ---
-        // Some adapters (PostgreSQL/MariaDB) require physical tables before any inserts.
-        let rawAdapter: any = currentDbAdapter;
-        while (rawAdapter && !rawAdapter.collection?.createModel && rawAdapter._rawAdapter) {
-          rawAdapter = rawAdapter._rawAdapter;
-        }
-
-        if (rawAdapter?.collection?.createModel) {
-          console.log(
-            `[TestingBridge] [${rawAdapter.constructor.name}] Ensuring physical tables...`,
-          );
-
-          // Use the schema from the request body for the immediate collection
-          const schemaToCreate = {
-            ...body.schema,
-            name,
-            _id: body.schema._id || name.toLowerCase(),
-            status: body.schema.status || "publish",
-          };
-
-          try {
-            await rawAdapter.collection.createModel(schemaToCreate);
-            console.log(`[TestingBridge] Physical table created/verified for: ${name}`);
-          } catch {
-            console.warn(`[TestingBridge] createModel failed for ${name}`);
-          }
-
-          // Also ensure other scanned schemas are present
-          for (const s of schemas) {
-            if (s.name === name) continue;
-            try {
-              await rawAdapter.collection.createModel(s);
-            } catch {
-              /* ignore */
-            }
-          }
-        }
-
-        // Wait a bit for filesystem/database to settle
-        await new Promise((r) => setTimeout(r, 3000));
-
-        return json({ success: true, message: `Collection ${name} created and reconciled` });
-      }
-
-      case "reinitialize":
       case "setup": {
-        // Forces the system to reload configuration and re-initialize adapters
-        // This is the "Warm Reload" optimization that avoids full process restarts.
-        const { reinitializeSystem, getDbInitPromise } = await import("@src/databases/db");
+        // Forces the system to recognize the setup is complete (useful after setup-wizard)
+        const { reinitializeSystem } = await import("@src/databases/db");
         await reinitializeSystem(true);
-
-        // Wait for it to settle
-        await getDbInitPromise();
-
         const { invalidateSetupCache } = await import("@src/utils/setup-check");
-        invalidateSetupCache(true);
-
-        console.log("[TestingBridge] Warm reload triggered via reinitialize action.");
+        invalidateSetupCache(false, true);
         return json({
           success: true,
-          message: "System re-initialized and configuration reloaded",
-        });
-      }
-
-      case "reset":
-      case "hard-reset": {
-        // 1. Clear Database
-        await currentDbAdapter.clearDatabase();
-
-        // 2. Clear all session caches to prevent session bleed
-        try {
-          const { clearAllSessionCaches } = await import("@src/hooks/handle-authentication");
-          await clearAllSessionCaches();
-        } catch (e) {
-          console.warn("[API/Testing] Non-fatal error clearing session caches:", e);
-        }
-
-        // 3. Invalidate setup cache
-        const { invalidateSetupCache } = await import("@src/utils/setup-check");
-        invalidateSetupCache(true, false);
-
-        // 4. Wipe uploaded media files
-        try {
-          const { getPublicSetting } = await import("@src/services/settings-service");
-          const fs = await import("node:fs");
-          const fsp = await import("node:fs/promises");
-          const path = await import("node:path");
-          const mediaFolderPath = (await getPublicSetting("MEDIA_FOLDER")) || "mediaFolder";
-          const fullPath = path.resolve(process.cwd(), mediaFolderPath);
-
-          if (fs.existsSync(fullPath)) {
-            const files = await fsp.readdir(fullPath);
-            for (const file of files) {
-              if (file !== ".gitkeep" && file !== "placeholder.png") {
-                await fsp.rm(path.join(fullPath, file), { recursive: true, force: true });
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("[API/Testing] Non-fatal error clearing media:", e);
-        }
-
-        // 5. Explicitly RE-SEED basic system state if needed to avoid 503s
-        // (Don't delete private.test.ts - we want to stay "WARM")
-        const { reinitializeSystem, getDbInitPromise } = await import("@src/databases/db");
-        await reinitializeSystem(true);
-        await getDbInitPromise();
-
-        console.log("[API/Testing] Warm hard-reset completed.");
-
-        return json({
-          success: true,
-          message:
-            "Hard reset complete: Config deleted, DB cleared, sessions wiped, and media reset",
+          message: "System marked as setup in-memory",
         });
       }
 
@@ -435,58 +270,6 @@ export async function POST(event: RequestEvent) {
         }
 
         return json({ error: "Invalid cleanup type" }, { status: 400 });
-      }
-
-      case "sdk-call": {
-        const { method, args } = body;
-        if (!method) return json({ error: "Missing method" }, { status: 400 });
-
-        // Split method (e.g., 'auth.login')
-        const parts = method.split(".");
-        let target: any = cms;
-
-        for (const part of parts) {
-          if (target[part] === undefined) {
-            return json({ error: `Method ${method} not found (missing ${part})` }, { status: 404 });
-          }
-          target = target[part];
-        }
-
-        if (typeof target !== "function") {
-          return json({ error: `Target ${method} is not a function` }, { status: 400 });
-        }
-
-        try {
-          // Bind the target to its parent object to ensure 'this' is correct
-          const parent =
-            parts.length > 1
-              ? parts.slice(0, -1).reduce((obj: any, p: string) => obj[p], cms)
-              : cms;
-
-          // Inject tenantId into options if it's an SDK call that supports it
-          const resolvedArgs = [...(args || [])];
-          const lastArg = resolvedArgs[resolvedArgs.length - 1];
-          if (
-            event.locals.tenantId &&
-            lastArg &&
-            typeof lastArg === "object" &&
-            !Array.isArray(lastArg)
-          ) {
-            lastArg.tenantId = lastArg.tenantId || event.locals.tenantId;
-          }
-
-          const result = await target.apply(parent, resolvedArgs);
-          return json({ success: true, data: result });
-        } catch (err: any) {
-          return json(
-            {
-              success: false,
-              error: err.message,
-              stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-            },
-            { status: 500 },
-          );
-        }
       }
 
       default:

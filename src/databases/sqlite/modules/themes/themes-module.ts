@@ -1,6 +1,6 @@
 /**
- * @file src/databases/sqlite/modules/themes/themes-module.ts
- * @description Themes management module for SQLite
+ * @file src/databases/mariadb/modules/themes/themes-module.ts
+ * @description Themes management module for MariaDB
  *
  * Features:
  * - Get active theme
@@ -37,29 +37,19 @@ export class ThemesModule {
     logger.debug("Theme models setup (no-op for SQL)");
   }
 
-  async getActive(): Promise<DatabaseResult<Theme | null>> {
+  async getActive(): Promise<DatabaseResult<Theme>> {
     return this.core.wrap(async () => {
-      try {
-        const [theme] = await this.db
-          .select()
-          .from(schema.themes)
-          .where(eq(schema.themes.isActive, true))
-          .limit(1);
+      const [theme] = await this.db
+        .select()
+        .from(schema.themes)
+        .where(eq(schema.themes.isActive, true))
+        .limit(1);
 
-        if (!theme) {
-          logger.debug("[SQLite] No active theme found in database");
-          return null;
-        }
-
-        return utils.convertDatesToISO(theme) as unknown as Theme;
-      } catch (error) {
-        // If table doesn't exist yet, return null gracefully instead of throwing
-        if (error instanceof Error && error.message.includes("no such table")) {
-          logger.warn("[SQLite] Themes table not found yet, returning no active theme");
-          return null;
-        }
-        throw error;
+      if (!theme) {
+        throw new Error("No active theme found");
       }
+
+      return utils.convertDatesToISO(theme) as unknown as Theme;
     }, "GET_ACTIVE_THEME_FAILED");
   }
 

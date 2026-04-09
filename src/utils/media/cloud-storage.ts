@@ -113,18 +113,16 @@ async function getCloudinary(config: CloudStorageConfig) {
   return cloudinary;
 }
 
-export function getPath(relativePath: string, prefix?: string): string {
+export function getPath(relativePath: string): string {
   const config = getConfig();
   const clean = relativePath.replace(/^\/+/, "");
-  const p = prefix ? `${prefix}/${clean}` : clean;
-  return config.mediaFolder ? `${config.mediaFolder}/${p}` : p;
+  return config.mediaFolder ? `${config.mediaFolder}/${clean}` : clean;
 }
 
-export function getUrl(relativePath: string, prefix?: string): string {
+export function getUrl(relativePath: string): string {
   const config = getConfig();
   if (config.storageType === "local") {
-    const base = prefix ? `/files/${prefix}/` : "/files/";
-    return (base + relativePath.replace(/^\/+/, "")).replace(/\/+/g, "/");
+    return `/files/${relativePath.replace(/^\/+/, "")}`;
   }
 
   if (!config.publicUrl) {
@@ -135,7 +133,7 @@ export function getUrl(relativePath: string, prefix?: string): string {
     throw error(500, "Cloud public URL not configured");
   }
 
-  const fullPath = getPath(relativePath, prefix);
+  const fullPath = getPath(relativePath);
   return `${config.publicUrl.replace(/\/+$/, "")}/${fullPath}`;
 }
 

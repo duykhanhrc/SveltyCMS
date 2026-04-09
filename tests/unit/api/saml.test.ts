@@ -53,7 +53,7 @@ describe("SAML API Unit Tests", () => {
       dbAdapter: {
         auth: { getUserById: vi.fn() },
       },
-      roles: user ? [] : [{ _id: "admin", name: "Admin", isAdmin: true, permissions: [] }],
+      roles: user ? [] : [{ _id: "admin-role", name: "Admin", isAdmin: true, permissions: [] }],
     });
   };
 
@@ -75,6 +75,6 @@ describe("SAML API Unit Tests", () => {
     const response = await dispatcher(event);
     const result = await response.json();
     expect(result.success).toBe(true);
-    expect(result.data.url).toBeDefined();
+    expect(result.url).toBeDefined();
   });
 });

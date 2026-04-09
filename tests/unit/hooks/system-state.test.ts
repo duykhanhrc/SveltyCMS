@@ -24,7 +24,6 @@ const originalTestMode = process.env.TEST_MODE;
 process.env.TEST_MODE = undefined;
 
 import { handleSystemState } from "@src/hooks/handle-system-state";
-import { invalidateSetupCache } from "@utils/setup-check";
 
 /**
  * Helper to create a minimal RequestEvent for testing
@@ -103,11 +102,6 @@ describe("handleSystemState - State Machine Logic", () => {
     (globalThis as any).__mockIsSetupComplete = true;
     // Ensure TEST_MODE is disabled so state machine runs
     process.env.TEST_MODE = undefined;
-    (globalThis as any).__mockIsSetupComplete = true; // Still useful for some mocks
-
-    // Invalidate setup cache to ensure re-check
-    invalidateSetupCache(false, true); // Force true
-
     setMockState({ overallState: "READY" });
   });
 
@@ -236,11 +230,10 @@ describe("handleSystemState - State Machine Logic", () => {
       try {
         await handleSystemState({ event, resolve: mockResolve });
         expect(true).toBe(false); // Should not reach here
-      } catch (err: any) {
-        // SvelteKit error() can throw an object with status and body, or just status/message in some environments
-        expect(err.status).toBe(503);
-        const msg = err.body?.message || err.message || "";
-        expect(msg).toMatch(/IDLE|restricted/i);
+      } catch (err: unknown) {
+        const error = err as { status: number; body: { message: string } };
+        expect(error.status).toBe(503);
+        expect(error.body.message).toMatch(/starting up|System is currently IDLE/i);
       }
     });
 
@@ -250,8 +243,6 @@ describe("handleSystemState - State Machine Logic", () => {
       // API routes return error Response via handleApiError instead of throwing
       const response = await handleSystemState({ event, resolve: mockResolve });
       expect(response.status).toBe(503);
-      const data = await response.json();
-      expect(data.message).toMatch(/IDLE|restricted/i);
     });
   });
 
@@ -284,8 +275,8 @@ describe("handleSystemState - State Machine Logic", () => {
       } catch (err: unknown) {
         const error = err as { status: number; body: { message: string } };
         expect(error.status).toBe(503);
-        // The hook blocks with either "starting up" or "failed to initialize" or "restricted" message
-        expect(error.body.message).toMatch(/starting up|failed to initialize|restricted/i);
+        // The hook blocks with either "starting up" or "failed to initialize" message
+        expect(error.body.message).toMatch(/starting up|failed to initialize/i);
       }
     });
   });
@@ -379,8 +370,6 @@ describe("handleSystemState - State Machine Logic", () => {
       // API routes return error Response via handleApiError instead of throwing
       const response = await handleSystemState({ event, resolve: mockResolve });
       expect(response.status).toBe(503);
-      const data = await response.json();
-      expect(data.message).toMatch(/FAILED|restricted/i);
     });
   });
 

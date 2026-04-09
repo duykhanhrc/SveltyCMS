@@ -537,7 +537,7 @@ export const contentService = {
       await bulkUpsertWithParentIds(dbAdapter, operations, tenantId, dbNodes);
     }
 
-    contentStore.sync(operations.length > 0 ? operations : dbNodes);
+    contentStore.sync(dbNodes.length > 0 ? dbNodes : operations);
   },
 
   async getContentStructureFromDatabase(

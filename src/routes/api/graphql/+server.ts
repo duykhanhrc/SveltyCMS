@@ -67,7 +67,6 @@ import { WebSocketServer } from "ws";
 import { NoSchemaIntrospectionCustomRule } from "graphql";
 import { dev } from "$app/environment";
 
-import { createLoaders } from "./loaders";
 import { createDepthLimitRule, createMaxAliasesRule } from "./rules";
 import { collectionsResolvers, registerCollections } from "./resolvers/collections";
 import { createCleanTypeName } from "@utils/utils";
@@ -293,11 +292,6 @@ async function setupGraphQL(dbAdapter: DatabaseAdapter, tenantId?: string | null
             };
           }
         ).contextData;
-        const loaders = createLoaders(
-          contextData?.dbAdapter as DatabaseAdapter,
-          contextData?.tenantId ?? null,
-        );
-
         return {
           user: contextData?.user,
           dbAdapter: contextData?.dbAdapter,
@@ -305,7 +299,6 @@ async function setupGraphQL(dbAdapter: DatabaseAdapter, tenantId?: string | null
           bypassTenantIsolation: contextData?.bypassTenantIsolation,
           locale: request.headers.get("accept-language")?.split(",")[0]?.trim().slice(0, 2) || "en", // Simple locale extraction
           pubSub,
-          loaders,
         };
       },
     });
@@ -323,7 +316,6 @@ async function setupGraphQL(dbAdapter: DatabaseAdapter, tenantId?: string | null
 
 // Store Yoga apps per tenant to prevent schema leakage
 const yogaApps = new Map<string, Promise<ReturnType<typeof createYoga<any, any>>>>();
-let wsInitPromise: Promise<void> | null = null;
 let wsServerInitialized = false;
 
 // Store global instance to prevent HMR EADDRINUSE errors
@@ -335,100 +327,92 @@ const globalWithWs = globalThis as typeof globalThis & {
 // We create a standalone WebSocket server on a different port.
 // In a production environment, you would ideally integrate this with your main HTTP server.
 async function initializeWebSocketServer(dbAdapter: DatabaseAdapter, tenantId?: string | null) {
+  // WebSocket server is currently global - in a full multi-tenant setup,
+  // this would need to handle dynamic schemas per connection or per tenant
   if (globalWithWs.__SVELTY_GRAPHQL_WS__ || wsServerInitialized || building) {
     return;
   }
 
-  if (wsInitPromise) return wsInitPromise;
+  try {
+    const { typeDefs, resolvers } = await createGraphQLSchema(dbAdapter, tenantId);
+    const schema = createSchema({ typeDefs, resolvers });
 
-  wsInitPromise = (async () => {
-    try {
-      // Re-check state after entering the promise chain
-      if (globalWithWs.__SVELTY_GRAPHQL_WS__ || wsServerInitialized) return;
+    const wsServer = new WebSocketServer({
+      port: 3001,
+      path: "/api/graphql",
+    });
 
-      const { typeDefs, resolvers } = await createGraphQLSchema(dbAdapter, tenantId);
-      const schema = createSchema({ typeDefs, resolvers });
+    globalWithWs.__SVELTY_GRAPHQL_WS__ = wsServer;
 
-      const wsServer = new WebSocketServer({
-        port: 3001,
-        path: "/api/graphql",
-      });
+    useServer(
+      {
+        schema,
+        context: async (ctx) => {
+          // Extract authentication from connection params
+          const connectionParams = ctx.connectionParams as
+            | {
+                authorization?: string;
+                sessionId?: string;
+                cookie?: string;
+              }
+            | undefined;
 
-      globalWithWs.__SVELTY_GRAPHQL_WS__ = wsServer;
+          let user: any = null;
 
-      useServer(
-        {
-          schema,
-          context: async (ctx) => {
-            // Extract authentication from connection params
-            const connectionParams = ctx.connectionParams as
-              | {
-                  authorization?: string;
-                  sessionId?: string;
-                  cookie?: string;
-                }
-              | undefined;
+          // Try multiple authentication methods
+          if (connectionParams) {
+            try {
+              // Method 1: Bearer token (for API tokens)
+              if (connectionParams.authorization) {
+                const token = connectionParams.authorization.replace(/^Bearer\s+/i, "");
+                const tokenValidation = await dbAdapter.auth.validateToken(
+                  token,
+                  undefined,
+                  "access",
+                  { tenantId: tenantId as DatabaseId },
+                );
 
-            let user: any = null;
-
-            // Try multiple authentication methods
-            if (connectionParams) {
-              try {
-                // Method 1: Bearer token (for API tokens)
-                if (connectionParams.authorization) {
-                  const token = connectionParams.authorization.replace(/^Bearer\s+/i, "");
-                  const tokenValidation = await dbAdapter.auth.validateToken(
-                    token,
-                    undefined,
-                    "access",
-                    { tenantId: tenantId as DatabaseId },
-                  );
-
-                  if (tokenValidation?.success) {
-                    const tokenData = await dbAdapter.auth.getTokenByValue(token, {
+                if (tokenValidation?.success) {
+                  const tokenData = await dbAdapter.auth.getTokenByValue(token, {
+                    tenantId: tenantId as DatabaseId,
+                  });
+                  if (tokenData?.success && tokenData.data) {
+                    const userResult = await dbAdapter.auth.getUserById(tokenData.data.user_id, {
                       tenantId: tenantId as DatabaseId,
                     });
-                    if (tokenData?.success && tokenData.data) {
-                      const userResult = await dbAdapter.auth.getUserById(tokenData.data.user_id, {
-                        tenantId: tenantId as DatabaseId,
+                    if (userResult?.success) {
+                      user = userResult.data;
+                      logger.info("WebSocket: User authenticated via token", {
+                        userId: user?._id,
                       });
-                      if (userResult?.success) {
-                        user = userResult.data;
-                        logger.info("WebSocket: User authenticated via token", {
-                          userId: user?._id,
-                        });
-                      }
                     }
                   }
                 }
-              } catch (error) {
-                logger.error("WebSocket authentication error:", {
-                  error: error instanceof Error ? error.message : "Unknown error",
-                });
               }
+            } catch (error) {
+              logger.error("WebSocket authentication error:", {
+                error: error instanceof Error ? error.message : "Unknown error",
+              });
             }
+          }
 
-            return {
-              user,
-              pubSub,
-              tenantId,
-            };
-          },
+          return {
+            user,
+            pubSub,
+            tenantId,
+          };
         },
-        wsServer,
-      );
+      },
+      wsServer,
+    );
 
-      wsServerInitialized = true;
-      logger.info("GraphQL WebSocket Server initialized on port 3001");
-    } catch (error) {
-      logger.error("Failed to initialize WebSocket server:", {
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-      wsInitPromise = null; // Allow retry on failure
-    }
-  })();
-
-  return wsInitPromise;
+    wsServerInitialized = true;
+    logger.info("GraphQL WebSocket Server initialized on port 3001");
+  } catch (error) {
+    logger.error("Failed to initialize WebSocket server:", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 }
 
 // Unified Error Handling
@@ -519,8 +503,10 @@ const handler = apiHandler(async (event: RequestEvent) => {
       throw new AppError("GraphQL Yoga returned no response", 500, "GRAPHQL_NO_RESPONSE");
     }
 
-    // Return a SvelteKit-compatible Response that supports streaming (for @defer and SSE)
-    return new Response(yogaResponse.body, {
+    // Return a SvelteKit-compatible Response
+    const bodyBuffer = await yogaResponse.arrayBuffer();
+
+    return new Response(bodyBuffer, {
       status: yogaResponse.status,
       statusText: yogaResponse.statusText,
       headers: yogaResponse.headers,

@@ -39,11 +39,9 @@ interface ModifyRequestParams {
   collectionName?: string;
   data: EntryData[];
   fields: FieldInstance[];
-  tenantId?: string | null;
+  tenantId?: string | null; // Add tenantId for multi-tenancy
   type: string;
   user: User;
-  skipValidation?: boolean;
-  action?: string;
 }
 
 // Function to modify request data based on field widgets
@@ -55,8 +53,6 @@ export async function modifyRequest({
   type,
   tenantId,
   collectionName,
-  skipValidation = false,
-  action,
 }: ModifyRequestParams) {
   const start = performance.now();
   try {
@@ -65,21 +61,25 @@ export async function modifyRequest({
       `Startingmodify-requestfor type: ${type}, user: ${user._id}, collection: ${collectionName ?? (collection as unknown as { id?: string }).id ?? "unknown"}, tenant: ${tenantId}`,
     );
 
-    // Optimize field iteration
     for (const field of fields) {
+      const fieldStart = performance.now();
+      // Access widget from store
       const widget = widgets.widgetFunctions[field.widget.Name];
-      if (!widget) continue;
-
-      const modifyFn = widget.modifyRequest;
-      const modifyBatchFn = widget.modifyRequestBatch;
-
-      if (!modifyFn && !modifyBatchFn) continue;
-
       const fieldName = getFieldName(field);
 
-      if (modifyBatchFn) {
-        // --- BATCH PROCESSING (Fastest) ---
+      logger.trace(`Processing field: ${fieldName}, widget: ${field.widget.Name}`);
+
+      // Resolve potential modify-request handler
+      const modifyFn = widget?.modifyRequest;
+      const modifyBatchFn = widget?.modifyRequestBatch;
+
+      if (modifyBatchFn && typeof modifyBatchFn === "function") {
+        // --- BATCH PROCESSING ---
+        logger.trace(`Processing batch for field: ${fieldName}, widget: ${field.widget.Name}`);
         try {
+          const batchStart = performance.now();
+
+          // Call batch function
           const batchResults = await modifyBatchFn({
             data: data as Record<string, unknown>[],
             collection,
@@ -88,22 +88,32 @@ export async function modifyRequest({
             type,
             tenantId,
             collectionName,
-            skipValidation,
-            action,
           });
 
+          // Update data with results
           if (Array.isArray(batchResults) && batchResults.length === data.length) {
+            // Update the original array elements to ensure changes are returned
             for (let i = 0; i < data.length; i++) {
               data[i] = batchResults[i] as EntryData;
             }
+          } else {
+            logger.warn(
+              `Batch processing for ${fieldName} returned invalid results length. Expected ${data.length}, got ${batchResults?.length}`,
+            );
           }
-        } catch (batchError) {
-          logger.error(
-            `Batch widget error for field ${fieldName}: ${batchError instanceof Error ? batchError.message : batchError}`,
+
+          const batchDuration = performance.now() - batchStart;
+          logger.debug(
+            `Batch processing for ${fieldName} completed in ${batchDuration.toFixed(2)}ms`,
           );
+        } catch (batchError) {
+          const errorMessage =
+            batchError instanceof Error ? batchError.message : "Unknown batch error";
+          logger.error(`Batch widget error for field ${fieldName}: ${errorMessage}`);
         }
-      } else if (modifyFn) {
-        // --- VECTORIZED PROCESSING ---
+      } else if (modifyFn && typeof modifyFn === "function") {
+        // --- VECTORIZED CHUNKED PROCESSING ---
+        // Process in chunks to keep event loop responsive while maintaining high throughput
         const chunkSize = 100;
         const totalItems = data.length;
 
@@ -114,17 +124,18 @@ export async function modifyRequest({
           const results = await Promise.all(
             chunk.map(async (entry) => {
               try {
-                // Optimized: Only copy if we absolute must, but here we keep for safety
-                // but use a more efficient accessor
+                // Use a copy to prevent accidental side effects across fields
                 const entryCopy = { ...entry };
                 const dataAccessor: DataAccessor<unknown> = {
-                  get: () => entryCopy[fieldName],
-                  update: (newData) => {
+                  get() {
+                    return entryCopy[fieldName];
+                  },
+                  update(newData) {
                     entryCopy[fieldName] = newData;
                   },
                 };
 
-                await (modifyFn as any)({
+                await modifyFn({
                   collection,
                   field,
                   data: dataAccessor,
@@ -132,25 +143,30 @@ export async function modifyRequest({
                   type,
                   tenantId,
                   collectionName,
-                  skipValidation,
-                  action,
                 });
                 return entryCopy;
-              } catch {
-                return entry;
+              } catch (widgetError) {
+                const errorMessage =
+                  widgetError instanceof Error ? widgetError.message : "Unknown widget error";
+                logger.error(`[Vectorized] Widget error for field ${fieldName}: ${errorMessage}`);
+                return entry; // Fallback to original entry on failure
               }
             }),
           );
 
+          // Update original data array with processed results
           for (let j = 0; j < results.length; j++) {
             data[i + j] = results[j];
           }
 
-          // Yield sparingly
-          if (totalItems > 500 && i + chunkSize < totalItems) {
+          // Yield to event loop if more chunks remain, prevents blocking on massive imports
+          if (i + chunkSize < totalItems) {
             await new Promise((resolve) => setTimeout(resolve, 0));
           }
         }
+
+        const fieldDuration = performance.now() - fieldStart;
+        logger.trace(`Field ${fieldName} vectorized in ${fieldDuration.toFixed(2)}ms`);
       }
     }
 

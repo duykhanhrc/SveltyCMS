@@ -35,14 +35,14 @@ SveltyCMS is designed for developers who prioritize performance, security, and a
 
 | Metric                   | SveltyCMS (Intel 2026)            | PayloadCMS (v3.x)              | Directus (v11.x)                   | Strapi (v5.x)            | Sveltia CMS         |
 | :----------------------- | :-------------------------------- | :----------------------------- | :--------------------------------- | :----------------------- | :------------------ |
-| **Avg API Read Latency** | **0.45–4.1 ms**                   | 4–12 ms (sub-10 ms co-located) | 3–18 ms (avg ~35 ms in some tests) | 6–25 ms (avg 120–150 ms) | N/A (Git-based)     |
-| **Avg Insert Latency**   | **0.17–0.72 ms**                  | 3–10 ms                        | 4–12 ms                            | 5–15 ms                  | N/A                 |
-| **Middleware Overhead**  | **1.2–3.5 µs** (27 µs total p95)  | ~115 µs                        | ~145 µs                            | ~180 µs                  | N/A (browser-based) |
-| **Throughput (RPS)**     | **3,000+ RPS** (Full Stack)       | ~900–2,100 RPS (REST/GraphQL)  | Lower (optimized ~ higher)         | 900–1,200 RPS (REST)     | N/A (static/Git)    |
+| **Avg API Read Latency** | **0.55–2.9 ms**                   | 4–12 ms (sub-10 ms co-located) | 3–18 ms (avg ~35 ms in some tests) | 6–25 ms (avg 120–150 ms) | N/A (Git-based)     |
+| **Avg Insert Latency**   | **0.65–1.6 ms**                   | 3–10 ms                        | 4–12 ms                            | 5–15 ms                  | N/A                 |
+| **Middleware Overhead**  | **1.1–8.5 µs** (92 µs total p95)  | ~115 µs                        | ~145 µs                            | ~180 µs                  | N/A (browser-based) |
+| **Throughput (RPS)**     | **1,600+ RPS** (Full Stack)       | ~900–2,100 RPS (REST/GraphQL)  | Lower (optimized ~ higher)         | 900–1,200 RPS (REST)     | N/A (static/Git)    |
 | **Media Upload**         | **0.12 ms** (async/background)    | 100–350 ms                     | 120–400 ms                         | 150–500 ms               | N/A                 |
-| **Cold Start**           | **~1.03 s** (Ready state)         | Variable (Next.js)             | ~5 s                               | ~8 s                     | Very fast (<300 ms) |
+| **Cold Start**           | **~1.05 s** (Ready state)         | Variable (Next.js)             | ~5 s                               | ~8 s                     | Very fast (<300 ms) |
 | **Bundle Size (Brotli)** | **~842 KB** (smallest)            | 3–5 MB+                        | Medium/Large                       | Largest                  | <300–500 KB         |
-| **Auth Latency**         | **< 0.5 ms** (3-layer cache)      | Not specified                  | Not highlighted                    | Not highlighted          | Fast (GitHub OAuth) |
+| **Auth Latency**         | **< 0.8 ms** (3-layer cache)      | Not specified                  | Not highlighted                    | Not highlighted          | Fast (GitHub OAuth) |
 | **Real-time / Sync**     | **Sub-100 ms** (SSE + Yjs)        | Good (with config)             | Supports WebSockets                | Limited                  | N/A (Git-based)     |
 | **Edge / Local SDK**     | **Native** (locals.cms injection) | Strong in Next.js              | Not native                         | Not native               | N/A                 |
 
@@ -55,31 +55,29 @@ SveltyCMS is designed for developers who prioritize performance, security, and a
 
 Are we faster? Yes, significantly, but more importantly, we are more **real**.
 
-In our previous tests, we measured raw adapter throughput hitting ~2,300 RPS on SQLite. Our April 2026 "Zero-Mock Production Audit" measures the **fully-loaded framework**. We now route requests through full Authentication, Session Validation, the 5-Pillar Hook pipelines, and the new **Vectorized `modifyRequest` pipeline**.
+In our previous tests, we measured raw adapter throughput hitting ~2,300 RPS on SQLite. Our April 2026 "Zero-Mock Production Audit" measures the **fully-loaded framework**. We now route requests through full Authentication, Session Validation, the 5-Pillar Hook pipelines, and intelligent deduplication logging.
 
-Even with this realistic, heavy production workload, SveltyCMS sustains **over 3,000 requests per second** (aggregate) with a p95 latency of just **4.1ms**. That is blazing fast for a fully secured, multi-tenant capable CMS. Furthermore, our Cold Starts have improved dramatically, dropping from 1,600ms down to ~1,030ms.
+Even with this realistic, heavy production workload, SveltyCMS sustains **over 1,600 requests per second** with a p95 latency of just **6ms**. That is blazing fast for a fully secured, multi-tenant capable CMS. Furthermore, our Cold Starts have improved dramatically, dropping from 1,600ms down to ~1,050ms.
 
 ### 2. 5-Pillar Architecture & Zero-Runtime Overhead
 
 The architectural move to the **5-Pillar Content Core** and Svelte 5 Runes provides fundamental advantages:
 
-- **Vectorized Processing**: Refactored the core data transformation pipeline to support chunked batch processing, reducing function call overhead by **70%**.
 - **No Hydration Tax**: SveltyCMS minimizes the JavaScript sent to the client, leading to faster Time-to-Interactive.
 - **Fine-Grained Reactivity**: State updates are surgical, avoiding the "re-rendering everything" problem common in React/Vue platforms.
+- **Small Footprint**: Our core build remains highly optimized at ~800 KB (Brotli), making it ideal for edge deployments.
 
 ### 3. Native Enterprise Security
 
 SveltyCMS treats security as a core feature, not a plugin:
 
-- **Fail-Closed API Dispatcher**: Exhaustive endpoint registration ensuring 100% security coverage by default. Unmapped routes are denied, eliminating "Shadow API" vulnerabilities.
 - **Crypto-Chained Audit Logs**: Tamper-evident logs (SHA-256) are standard, ensuring compliance with SOC 2 and GDPR.
 - **SCIM 2.0 & SAML**: Native support for automated user provisioning and enterprise SSO.
 - **Multi-Tenancy**: Native `tenantId` isolation at the database adapter level, preventing cross-tenant data leaks.
 
-### 4. Accessibility & UI Performance
+### 4. Accessibility Foundation
 
-- **3-Pillar Performance Shield**: Isolated server-side widget logic protecting the API hot path from UI-driven lag.
-- **WCAG 3.0 Ready**: We prioritize accessibility as a functional requirement, adopting the latest Functional Performance patterns.
+We prioritize accessibility as a functional requirement. Our UI components are built on a strong **WCAG 2.2 AA+** foundation, and we are actively adopting **WCAG 3.0 Functional Performance** patterns as the standard evolves.
 
 ## Competitive Context
 

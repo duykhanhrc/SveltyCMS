@@ -65,11 +65,11 @@ export type {
   User,
 } from "./types";
 
-// Import shared password utilities (Argon2id)
+// Import shared crypto utilities with Argon2
 import {
   hashPassword as cryptoHashPassword,
   verifyPassword as cryptoVerifyPassword,
-} from "@utils/password";
+} from "@utils/crypto";
 // Import for internal use
 import { SESSION_COOKIE_NAME } from "./constants";
 
@@ -875,10 +875,10 @@ export async function hashPassword(password: string): Promise<string> {
  * Verify password against hash using constant-time comparison
  *
  * SECURITY: Timing-safe verification prevents side-channel attacks
- * @param hash - Hashed password to compare against
  * @param password - Plain text password to verify
+ * @param hash - Hashed password to compare against
  * @returns Promise resolving to true if password matches
  */
-export async function verifyPassword(hash: string, password: string): Promise<boolean> {
-  return cryptoVerifyPassword(hash, password);
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return cryptoVerifyPassword(password, hash);
 }

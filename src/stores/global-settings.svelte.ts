@@ -1,18 +1,10 @@
 /**
  * @file src/stores/global-settings.svelte.ts
- * @description
- * **Public Environment Store**: The safe, reactive source for non-sensitive site settings.
+ * @description Global Settings Store for PUBLIC ONLY
  *
- * 🔒 SECURITY: This store ONLY handles public settings (Site Name, Themes, Versions).
- *
- * ### Responsibilities:
- * - Reactive state for public environment variables ($state).
- * - Validation of incoming settings against `publicConfigSchema`.
- * - Guarding against redundant environment re-initialization (Circuit Breaker).
- *
- * ### Next Steps & Options:
- * - Values here are used for UI customization (e.g. siteName in headers).
- * - Accessed globally via the `publicEnv` proxy.
+ * 🔒 SECURITY: This file only contains PUBLIC settings safe for client-side use.
+ * Private settings (DB passwords, API keys, etc.) are NEVER exposed here.
+ * They remain server-only in src/services/settingsService.ts
  */
 
 import { publicConfigSchema } from "../databases/public-config-schema";
@@ -73,8 +65,6 @@ export function isPublicEnvReady(): boolean {
   return getStore().isReady;
 }
 
-let lastEnvHash = "";
-
 /**
  * Initialize the public environment settings from the server.
  */
@@ -83,11 +73,6 @@ export function initPublicEnv(env: PublicEnv) {
     logger.warn("[GlobalSettings] Attempted to initialize with invalid environment object");
     return;
   }
-
-  // Prevent redundant updates that trigger reactivity loops
-  const currentHash = JSON.stringify(env);
-  if (currentHash === lastEnvHash) return;
-  lastEnvHash = currentHash;
 
   getStore().init(env);
 

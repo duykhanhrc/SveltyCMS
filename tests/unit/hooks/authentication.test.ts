@@ -24,18 +24,6 @@ vi.mock("$app/navigation", () => ({
   beforeNavigate: vi.fn(),
 }));
 
-vi.mock("@sveltejs/kit", async () => {
-  const actual = await vi.importActual("@sveltejs/kit");
-  return {
-    ...actual,
-    error: vi.fn((status, message) => {
-      const err = new Error(message) as any;
-      err.status = status;
-      throw err;
-    }),
-  };
-});
-
 // --- Test Utilities ---
 
 function createMockEvent(
@@ -119,14 +107,6 @@ describe("handleAuthentication Middleware", () => {
   });
 
   describe("Tenant Isolation", () => {
-    beforeEach(() => {
-      (globalThis as any).privateEnv = { MULTI_TENANT: true };
-    });
-
-    afterEach(() => {
-      (globalThis as any).privateEnv = undefined;
-    });
-
     it("should reject session from different tenant", async () => {
       const mockUser = { _id: "user123", tenantId: "tenant1" };
       (auth!.validateSession as any).mockImplementation(() => Promise.resolve(mockUser));

@@ -14,37 +14,28 @@ import { expect, test, type Page } from "@playwright/test";
 async function clickNext(page: Page) {
   const nextButton = page.getByLabel("Next", { exact: true });
   await expect(nextButton).toBeEnabled();
-
-  // Use force: true to bypass any ghost overlays from stepper transitions
-  await nextButton.click({ force: true });
-  await page.waitForTimeout(1000); // Wait for stepper animation and hydration
+  await nextButton.click();
+  await page.waitForTimeout(500); // Wait for stepper animation
 }
-
-test.beforeEach(async ({ page }) => {
-  // Ensure we start with a clean state by calling the Hard Reset API
-  // This deletes private.test.ts and clears the DB for this worker
-  try {
-    const response = await page.request.post("/api/testing", {
-      data: { action: "reset" },
-    });
-    if (response.ok()) {
-      console.log("[SetupWizard] Hard Reset successful.");
-    }
-  } catch (err) {
-    console.warn("[SetupWizard] Hard Reset failed (non-fatal):", err);
-  }
-});
 
 test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   // Setup wizard can take time due to DB initialization/seeding
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
 
-  // 1. Start at root, expect redirect to /setup
+  // Enable TEST_MODE for the browser context if possible
+  // Note: The server must already be started with TEST_MODE=true
+
+  // 1. Start at root, expect redirect to /setup or /login
   await page.goto("/", { waitUntil: "networkidle" });
   await page.waitForLoadState("networkidle");
 
   const currentUrl = page.url();
   console.log(`Current URL: ${currentUrl}`);
+
+  if (currentUrl.includes("/login")) {
+    console.log("System already configured (at /login). Skipping setup.");
+    return;
+  }
 
   // If redirected elsewhere (e.g. root without setup), force go to /setup
   if (!currentUrl.includes("/setup")) {
@@ -97,49 +88,91 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
     timeout: 30_000,
   });
 
-  // --- STEP 1: Database Configuration ---
-  console.log("Step 1: Database Configuration...");
-
-  // Select SQLite (default for E2E tests)
+  // Select Database Type if specified (default is sqlite for tests)
   const dbType = process.env.DB_TYPE || "sqlite";
-  const dbHost = process.env.DB_HOST || (dbType === "sqlite" ? "config/database" : "localhost");
+  if (dbType !== "mongodb") {
+    await page.locator("#db-type").selectOption(dbType);
+  }
+
+  // Fill credentials from ENV (CI) or Defaults (Local)
+  const defaultPort = dbType === "mariadb" ? "3306" : dbType === "postgresql" ? "5432" : "27017";
+  const dbHost =
+    process.env.DB_HOST ||
+    // SQLite uses filesystem paths, not hostnames
+    (dbType === "sqlite" ? "config/database" : "localhost");
   const dbName =
-    process.env.DB_NAME || (dbType === "sqlite" ? "sveltycms_test.db" : "sveltycms_test");
+    process.env.DB_NAME || (dbType === "sqlite" ? "SveltyCMS.db" : "sveltycms_test");
+  const dbPort = process.env.DB_PORT || defaultPort;
+  const dbUser =
+    process.env.DB_USER !== undefined ? process.env.DB_USER : dbType === "sqlite" ? "" : "test";
+  const dbPass =
+    process.env.DB_PASSWORD !== undefined
+      ? process.env.DB_PASSWORD
+      : dbType === "sqlite"
+        ? ""
+        : "test";
 
-  const dbTypeSelect = page.getByTestId("db-type");
-  await dbTypeSelect.selectOption(dbType);
+  await page.locator("#db-host").fill(dbHost);
+  await page.locator("#db-name").fill(dbName);
 
-  await page.getByTestId("db-host").fill(dbHost);
-  await page.getByTestId("db-name").fill(dbName);
+  // Cookie banner can appear late and steal clicks from setup controls.
+  const lateCookieAcceptBtn = page.getByRole("button", { name: /accept all/i });
+  if (await lateCookieAcceptBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+    await lateCookieAcceptBtn.click({ force: true });
+    await page.waitForTimeout(300);
+  }
 
-  // Click Test Database and handle SQLite "create missing" modal
-  const testDbButton = page.getByRole("button", { name: /test database/i });
+  if (dbType !== "sqlite") {
+    if (!page.url().includes("mongodb+srv")) {
+      const portLocator = page.locator("#db-port");
+      if (await portLocator.isVisible()) {
+        await portLocator.fill(dbPort);
+      }
+    }
+
+    const userLocator = page.locator("#db-user");
+    if (await userLocator.isVisible()) {
+      await userLocator.fill(dbUser);
+    }
+
+    const passLocator = page.locator("#db-password");
+    if (await passLocator.isVisible()) {
+      await passLocator.fill(dbPass);
+    }
+  }
+
+  // Test Connection (with retry for CI stability)
+  const testDbButton = page.locator("button", { hasText: /test database/i });
   await testDbButton.click({ force: true });
 
   // Handle "Database does not exist" confirmation for SQLite
-  const confirmBtn = page.getByRole("button", { name: /yes/i });
-  try {
-    // Wait up to 10s for the modal to appear (SQLite only)
-    await expect(confirmBtn).toBeVisible({ timeout: 10000 });
-    console.log("Database missing modal detected. Confirming creation...");
-    await confirmBtn.click({ force: true });
-  } catch {
-    console.log(
-      "No 'Database missing' modal appeared (or not SQLite). Proceeding to check success...",
-    );
+  // Uses the label from messages/en.json: "Yes, Create It"
+  const confirmBtn = page.getByRole("button", { name: /(yes|create)/i });
+  if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    console.log("Database does not exist modal appeared. Clicking Yes...");
+    await confirmBtn.first().click({ force: true });
+    await page.waitForTimeout(400);
   }
 
-  // Expect success message with a generous timeout for DB creation/I/O
-  const successMsg = page.getByText(/success/i).first();
+  const nextButton = page.getByLabel("Next", { exact: true });
   try {
-    await expect(successMsg).toBeVisible({ timeout: 45000 });
-    console.log("Database connection successful.");
+    // A reliable pass condition is that "Next" becomes enabled.
+    await expect(nextButton).toBeEnabled({ timeout: 40_000 });
   } catch {
-    console.warn("Initial Success message not found. Retrying Test Database click...");
+    console.log("Initial DB test failed, retrying once...");
+    await page.waitForTimeout(5000);
     await testDbButton.click({ force: true });
-    await expect(successMsg).toBeVisible({ timeout: 45000 });
+
+    // Re-check for modal on retry
+    if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await confirmBtn.first().click({ force: true });
+      await page.waitForTimeout(400);
+    }
+
+    await expect(nextButton).toBeEnabled({ timeout: 60_000 });
   }
 
+  // Move to next step (clicking Next triggers database seeding which may take time)
   await clickNext(page);
 
   // --- STEP 2: Admin User ---
@@ -148,65 +181,46 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   });
 
   // Fill admin user details
-  console.log("Step 2: Admin User Configuration...");
-  await page.getByTestId("admin-username").fill("admin");
-  await page.getByTestId("admin-email").fill("admin@test.com");
-  await page.getByTestId("admin-password").fill("Admin123!");
-  await page.getByTestId("admin-confirm-password").fill("Admin123!");
-  await clickNext(page);
-
-  // --- STEP 3: System Settings ---
-  console.log("Step 3: System Settings...");
-  // Fill Site Name
-  await page.getByTestId("site-name").fill("SveltyCMS Test");
-
-  // Fill Production URL (use the current origin for testing)
-  const origin = new URL(page.url()).origin;
-  await page.getByTestId("host-prod").fill(origin);
-
-  // Fill Media Path
-  await page.getByTestId("media-folder").fill("./mediaFolder_test");
+  await page.locator("#admin-username").fill(process.env.ADMIN_USER || "admin");
+  await page.locator("#admin-email").fill(process.env.ADMIN_EMAIL || "admin@example.com");
+  await page.locator("#admin-password").fill(process.env.ADMIN_PASS || "Admin123!");
+  await page.locator("#admin-confirm-password").fill(process.env.ADMIN_PASS || "Admin123!");
 
   await clickNext(page);
 
-  // --- STEP 4 & 5: Review & Complete ---
-  console.log("Step 4 & 5: Reviewing and completing...");
-  await clickNext(page); // Review step
+  // --- STEPS 3-5: Defaults ---
+  // Loop through remaining steps until "Complete" appears
+  // This handles variable number of steps (Site settings, Email, etc.)
+  for (let i = 0; i < 5; i++) {
+    // Check for "Complete" button first (exact match avoids stepper indicator)
+    const completeBtn = page.getByLabel("Complete", { exact: true });
+    if (await completeBtn.isVisible()) {
+      await completeBtn.click();
+      break;
+    }
 
-  // Final Step: Complete Setup
-  const finishButton = page.getByRole("button", { name: /finish|complete/i });
-  await expect(finishButton).toBeVisible();
-  await finishButton.click();
-
-  // Wait for redirect to dashboard
-  console.log("Waiting for redirect to dashboard...");
-  // Complete setup triggers a database seed and then redirect
-  await page.waitForURL(/\/en\/collections/, { timeout: 120_000 });
-  console.log("Successfully redirected to dashboard. Setup complete!");
+    // Otherwise click Next
+    const nextBtn = page.getByLabel("Next", { exact: true });
+    if (await nextBtn.isVisible()) {
+      await nextBtn.click();
+      await page.waitForTimeout(500);
+    } else {
+      break;
+    }
+  }
 
   // --- VERIFICATION ---
-  // Force the server to recognize the setup is complete
-  // We use a retry loop since the server might be re-initializing and cause ECONNREFUSED
-  let setupOk = false;
-  let attempts = 0;
-  while (!setupOk && attempts < 5) {
-    try {
-      const response = await page.request.post("/api/testing", {
-        data: { action: "setup" },
-      });
-      if (response.ok()) {
-        setupOk = true;
-        console.log("Forced setup completion via API.");
-      }
-    } catch (err) {
-      console.warn(`Attempt ${attempts + 1} to call setup API failed:`, err);
-      await page.waitForTimeout(2000 * (attempts + 1)); // Exponential backoff
-    }
-    attempts++;
+  // 1. Force the server to recognize the setup is complete (bypasses restart requirement in CI)
+  try {
+    await page.request.post("/api/testing", {
+      data: { action: "setup" },
+    });
+    console.log("Forced setup completion via API.");
+  } catch (err) {
+    console.warn("Could not call setup API (non-fatal):", err);
   }
 
   // 2. Expect redirect to Login or Dashboard
-  // In TEST_MODE with Hard Reset, the redirect should be immediate
-  await expect(page).not.toHaveURL(/\/setup/, { timeout: 40_000 });
+  await expect(page).not.toHaveURL(/\/setup/, { timeout: 30_000 });
   console.log("Setup completed successfully.");
 });

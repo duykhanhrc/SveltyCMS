@@ -29,7 +29,7 @@ export const TokenSchema = new Schema(
   },
 );
 
-// TokenSchema.index({ token: 1 }); // Redundant, already part of unique: true in schema
+TokenSchema.index({ token: 1 });
 TokenSchema.index({ expires: 1 }, { expireAfterSeconds: 0 });
 TokenSchema.index({ tenantId: 1 });
 
@@ -53,7 +53,6 @@ export class TokenAdapter {
       const tokenValue = generateRandomToken(32);
       const token = new this.TokenModel({
         ...data,
-        email: data.email.toLowerCase(),
         token: tokenValue,
         _id: generateId(),
       });

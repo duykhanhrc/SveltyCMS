@@ -32,7 +32,6 @@ export interface BenchmarkOptions {
   concurrency?: number;
   onIteration?: (i: number) => Promise<void> | void;
   onWarmup?: (i: number) => Promise<void> | void;
-  silent?: boolean;
 }
 
 /**
@@ -46,25 +45,22 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
     concurrency = 1,
     onIteration,
     onWarmup,
-    silent = false,
   } = options;
 
-  if (!silent) {
-    console.log(`\n🚀 BENCHMARK: ${name}`);
-    console.log(
-      `   Iterations: ${iterations} | Concurrency: ${concurrency} | Warmup: ${warmupIterations}`,
-    );
-  }
+  console.log(`\n🚀 BENCHMARK: ${name}`);
+  console.log(
+    `   Iterations: ${iterations} | Concurrency: ${concurrency} | Warmup: ${warmupIterations}`,
+  );
 
   // --- 1. Warmup Phase ---
   if (warmupIterations > 0 && onWarmup) {
-    if (!silent) process.stdout.write(`   🔥 Warming up... `);
+    process.stdout.write(`   🔥 Warming up... `);
     await executePool(concurrency, warmupIterations, onWarmup);
-    if (!silent) process.stdout.write(`Done.\n`);
+    process.stdout.write(`Done.\n`);
   } else if (warmupIterations > 0 && onIteration) {
-    if (!silent) process.stdout.write(`   🔥 Warming up... `);
+    process.stdout.write(`   🔥 Warming up... `);
     await executePool(concurrency, warmupIterations, onIteration);
-    if (!silent) process.stdout.write(`Done.\n`);
+    process.stdout.write(`Done.\n`);
   }
 
   // --- 2. Measurement Phase ---
@@ -72,7 +68,7 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
   let successCount = 0;
   let failureCount = 0;
 
-  if (!silent) console.log(`   🧪 Measuring...`);
+  console.log(`   🧪 Measuring...`);
   const startTotal = performance.now();
 
   await executePool(concurrency, iterations, async (i) => {
@@ -123,9 +119,7 @@ export async function runBenchmark(options: BenchmarkOptions): Promise<Benchmark
     timestamp: new Date().toISOString(),
   };
 
-  if (!silent) {
-    printReport(result);
-  }
+  printReport(result);
   return result;
 }
 
@@ -190,5 +184,5 @@ export function exportResult(result: BenchmarkResult, filename?: string) {
   const name = filename || `${sanitizedName}.json`;
   const filePath = path.join(dir, name);
   fs.writeFileSync(filePath, JSON.stringify(result, null, 2));
-  // Skip log in silent mode or when exporting from a suite
+  console.log(`💾 Results exported to: ${filePath}`);
 }

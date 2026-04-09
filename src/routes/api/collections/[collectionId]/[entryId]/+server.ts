@@ -18,7 +18,7 @@ export const GET = apiHandler(async ({ params, locals }) => {
   }
 
   const result = await cms.collections.findById(collectionId, entryId, { tenantId });
-  return json(result);
+  return json({ success: true, data: result.data || result });
 });
 
 export const PATCH = apiHandler(async ({ params, request, locals }) => {

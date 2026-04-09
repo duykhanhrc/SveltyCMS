@@ -221,7 +221,11 @@ describe("2FA API Unit Tests", () => {
           cookies: { csrf_token: "mock-csrf-token" },
         },
       );
-      await expect(POST_VERIFY(event)).rejects.toThrow("Invalid code");
+      const response = await POST_VERIFY(event);
+      const result = await response.json();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe("Invalid code");
     });
 
     it("should throw TENANT_REQUIRED in multi-tenant mode without tenant context", async () => {
@@ -241,7 +245,7 @@ describe("2FA API Unit Tests", () => {
       // Override tenantId for this specific test to be undefined
       (event.locals as any).tenantId = undefined;
 
-      await expect(POST_VERIFY(event)).rejects.toThrow("Tenant ID required");
+      await expect(POST_VERIFY(event)).rejects.toThrow("Tenant context is required");
     });
 
     it("should use locals.tenantId in multi-tenant mode", async () => {
@@ -269,8 +273,10 @@ describe("2FA API Unit Tests", () => {
       const user = { _id: "user-1", email: "test@example.com" };
       mockTwoFactorService.initiate2FASetup.mockResolvedValue({
         success: true,
-        qrCode: "qr-data",
-        secret: "secret",
+        data: {
+          qrCode: "qr-data",
+          secret: "secret",
+        },
       });
 
       const event = createMockEvent({}, user, undefined, "setup", {
@@ -301,8 +307,7 @@ describe("2FA API Unit Tests", () => {
       });
       const response = await POST_SETUP(event);
       const result = await response.json();
-      expect(result.success).toBe(true);
-      expect(result.data.success).toBe(false);
+      expect(result.success).toBe(false);
     });
   });
 
@@ -329,7 +334,9 @@ describe("2FA API Unit Tests", () => {
         headers: { "X-CSRF-Token": "mock-csrf-token" },
         cookies: { csrf_token: "mock-csrf-token" },
       });
-      await expect(POST_VERIFY_SETUP(event)).rejects.toThrow("Invalid verification code");
+      const response = await POST_VERIFY_SETUP(event);
+      const result = await response.json();
+      expect(result.success).toBe(false);
     });
   });
 
@@ -365,7 +372,9 @@ describe("2FA API Unit Tests", () => {
         headers: { "X-CSRF-Token": "mock-csrf-token" },
         cookies: { csrf_token: "mock-csrf-token" },
       });
-      await expect(POST_DISABLE(event)).rejects.toThrow("Failed to disable 2FA");
+      const response = await POST_DISABLE(event);
+      const result = await response.json();
+      expect(result.success).toBe(false);
     });
   });
 
@@ -373,7 +382,7 @@ describe("2FA API Unit Tests", () => {
     it("should return 2FA status (GET)", async () => {
       const user = { _id: "user-1" };
       mockTwoFactorService.get2FAStatus.mockResolvedValue({
-        enabled: true,
+        is2FAEnabled: true,
         backupCodesRemaining: 5,
       });
 
@@ -385,7 +394,7 @@ describe("2FA API Unit Tests", () => {
       const result = await response.json();
 
       expect(result.success).toBe(true);
-      expect(result.data.enabled).toBe(true);
+      expect(result.data.is2FAEnabled).toBe(true);
     });
 
     it("should regenerate backup codes (POST)", async () => {
@@ -401,7 +410,7 @@ describe("2FA API Unit Tests", () => {
       const result = await response.json();
 
       expect(result.success).toBe(true);
-      expect(result.data).toEqual(["n1", "n2"]);
+      expect(result.backupCodes).toEqual(["n1", "n2"]);
     });
   });
 });

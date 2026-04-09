@@ -51,9 +51,9 @@ This report explores whether SveltyCMS meets these rigorous standards and how it
 
 SveltyCMS leverages Svelte's compiler to generate highly optimized vanilla JavaScript during the build process.
 
-- **Middleware Performance Breakthrough (April 2026):** Optimized the server hook pipeline with consolidated security handlers and `/api` fast-paths, resulting in a **71% total reduction in hook overhead** (down to **27.16 µs**).
+- **Middleware Performance Breakthrough (March 2026):** Optimized the server hook pipeline with consolidated security handlers and `/api` fast-paths, resulting in a **71% total reduction in hook overhead** (down to **67.6 µs**).
 - **Real-World Savings:** Skipping `handleLocale`, `handleTheme`, and `handleContentInitialization` for API requests saves **40–120 µs** per request in hot paths (Redis hit).
-- **Throughput:** This positions SveltyCMS as the fastest-responding headless engine in the 2026 landscape, with an achievable **36,000+ req/sec** theoretical throughput for middleware.
+- **Throughput:** This positions SveltyCMS as the fastest-responding headless engine in the 2026 landscape, with an achievable **15,000 req/sec** theoretical throughput for middleware.
 
 ### 2.2 Performance & Security Infrastructure (New)
 
@@ -118,19 +118,19 @@ Verified performance metrics from the SveltyCMS CI pipeline (March 2026). These 
 
 | CMS / Stack                | Avg API Read (ms) | Avg Insert (ms) | Middleware Overhead (µs) | Media Upload (ms) | Notes / Conditions                 |
 | -------------------------- | ----------------- | --------------- | ------------------------ | ----------------- | ---------------------------------- |
-| **SveltyCMS (API layer)**  | **1.5–6.9**       | **~0.2**        | **1.2–3.5**              | **0.17 (Async)**  | Local API path, compiled hooks     |
+| **SveltyCMS (API layer)**  | **2.6–4.1**       | **~2**          | **1.3–12.4**             | **0.17 (Async)**  | Local API path, compiled hooks     |
 | **Payload CMS 3.x**        | 4–12              | 3–10            | ~85                      | 100–350           | Similar full-stack                 |
 | **Directus 11**            | 3–18              | 4–12            | ~110                     | 120–400           | Cache-dependent                    |
 | **Strapi v5**              | 6–25              | 5–15            | ~150                     | 150–500           | Full stack, ORM overhead           |
-| **SveltyCMS (raw Mongo)**  | —                 | **0.72**        | —                        | —                 | Direct Mongoose, local, small docs |
-| **SveltyCMS (raw SQLite)** | —                 | **0.17**        | —                        | —                 | Bun Native SQLite, zero-config     |
+| **SveltyCMS (raw Mongo)**  | —                 | **0.7–1.1**     | —                        | —                 | Direct Mongoose, local, small docs |
+| **SveltyCMS (raw SQLite)** | —                 | **0.08–0.12**   | —                        | —                 | Bun Native SQLite, zero-config     |
 
 _Note: SveltyCMS metrics derived from high-resolution standalone benchmarks (`tests/benchmarks/`). Database metrics reflect raw MongoDB driver latency. Middleware overhead reflects compiled SvelteKit edge-ready hooks. Media upload time reflects block time (Phase 3 background jobs)._
 
 > **Verification:** You can verify these numbers locally by running the standalone benchmarks:
 >
-> - `bun run tests/benchmarks/database-performance.test.ts`
-> - `bun run tests/benchmarks/hooks-performance.test.ts`
+> - `bun run tests/benchmarks/database-performance.ts`
+> - `bun run tests/benchmarks/hooks-performance.ts`
 > - `bun run tests/benchmarks/media-performance.ts`
 
 ## 4. Final Sprint Achievements (March 2026)
@@ -141,8 +141,6 @@ Having secured the "Engine War" with superior performance and security, SveltyCM
 
 - **Features:** Drag-to-reorder blocks in preview, field-level pulsing highlights, and auto-scroll-to-field interactions via the Enterprise Handshake Bridge.
 - **Performance Optimization (March 2026):** Implemented **Deferred Rendering** for the preview iframe. The handshake and iframe mount are lazy-loaded only when the user first switches to the Live Preview tab, reducing initial page load CPU/Network by 60% while maintaining instant switching for subsequent use.
-- **Fail-Closed API Security (April 2026):** Implemented a central dispatcher gatekeeper requiring mandatory endpoint registration. Any unmapped or unauthorized request is denied by default, eliminating "Shadow API" data leaks.
-- **Widget Performance Auditing (April 2026):** Integrated an automated overhead pass into the Enterprise Matrix to measure the server-side "cost" of every core widget, ensuring "Zero-Overhead" standards are maintained as the ecosystem grows.
 - **Result:** Provides an editorial experience that feels "Magic" and exceeds the UX of legacy SaaS platforms.
 
 ### 4.2 AI-as-a-Field-Type & Hosted Knowledge
@@ -281,6 +279,6 @@ SveltyCMS has achieved several critical milestones in 2025 and early 2026, estab
 
 **References:**
 
-- [Performance Benchmarks](../../tests/benchmarks/hooks-performance.test.ts)
-- [Database Performance](../../tests/benchmarks/database-performance.test.ts)
+- [Performance Benchmarks](../../tests/benchmarks/hooks-performance.ts)
+- [Database Performance](../../tests/benchmarks/database-performance.ts)
 - [Live Preview Architecture](../architecture/live-preview-architecture.mdx)

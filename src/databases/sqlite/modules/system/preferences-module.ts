@@ -4,7 +4,7 @@
  */
 
 import { isoDateStringToDate, nowISODateString } from "@src/utils/date-utils";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { DatabaseId, DatabaseResult } from "../../../db-interface";
 import type { AdapterCore } from "../../adapter/adapter-core";
 import * as schema from "../../schema";
@@ -29,24 +29,18 @@ export class PreferencesModule {
     const startTime = performance.now();
     return this.core
       .wrap(async () => {
-        if (!key) throw new Error("Key is required");
         const conditions: import("drizzle-orm").SQL[] = [eq(schema.systemPreferences.key, key)];
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
         const [result] = await this.db
           .select()
           .from(schema.systemPreferences)
-          .where(conditions.length > 1 ? and(...conditions) : conditions[0])
+          .where(and(...conditions))
           .limit(1);
 
         if (!result) return null;
@@ -66,27 +60,20 @@ export class PreferencesModule {
     const startTime = performance.now();
     return this.core
       .wrap(async () => {
-        if (!keys || keys.length === 0) return {};
         const conditions: import("drizzle-orm").SQL[] = [
           inArray(schema.systemPreferences.key, keys),
         ];
-
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
         const results = await this.db
           .select()
           .from(schema.systemPreferences)
-          .where(conditions.length > 1 ? and(...conditions) : conditions[0] || undefined);
+          .where(and(...conditions));
 
         const prefs: Record<string, T> = {};
         for (const result of results) {
@@ -112,22 +99,17 @@ export class PreferencesModule {
         const conditions: import("drizzle-orm").SQL[] = [
           eq(schema.systemPreferences.visibility, category),
         ];
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
         const results = await this.db
           .select()
           .from(schema.systemPreferences)
-          .where(conditions.length > 1 ? and(...conditions) : conditions[0] || undefined);
+          .where(and(...conditions));
 
         const prefs: Record<string, T> = {};
         for (const result of results) {
@@ -226,21 +208,14 @@ export class PreferencesModule {
     return this.core
       .wrap(async () => {
         const conditions: import("drizzle-orm").SQL[] = [eq(schema.systemPreferences.key, key)];
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
-        await this.db
-          .delete(schema.systemPreferences)
-          .where(conditions.length > 1 ? and(...conditions) : conditions[0] || undefined);
+        await this.db.delete(schema.systemPreferences).where(and(...conditions));
       }, "DELETE_PREFERENCE_FAILED")
       .then((res) => {
         if (res.success) res.meta = { executionTime: performance.now() - startTime };
@@ -260,21 +235,16 @@ export class PreferencesModule {
         if (keys.length > 0) {
           conditions.push(inArray(schema.systemPreferences.key, keys));
         }
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
         const q = this.db.delete(schema.systemPreferences);
         if (conditions.length > 0) {
-          await q.where(conditions.length > 1 ? and(...conditions) : conditions[0] || undefined);
+          await q.where(and(...conditions));
         } else {
           await q;
         }
@@ -290,21 +260,16 @@ export class PreferencesModule {
     return this.core
       .wrap(async () => {
         const conditions: import("drizzle-orm").SQL[] = [];
-        if (scope === undefined || scope === null) {
-          conditions.push(isNull(schema.systemPreferences.scope));
-        } else {
+        if (scope) {
           conditions.push(eq(schema.systemPreferences.scope, scope));
         }
-
-        if (userId === undefined || userId === null) {
-          conditions.push(isNull(schema.systemPreferences.userId));
-        } else {
+        if (userId) {
           conditions.push(eq(schema.systemPreferences.userId, userId));
         }
 
         const q = this.db.delete(schema.systemPreferences);
         if (conditions.length > 0) {
-          await q.where(conditions.length > 1 ? and(...conditions) : conditions[0] || undefined);
+          await q.where(and(...conditions));
         } else {
           await q;
         }

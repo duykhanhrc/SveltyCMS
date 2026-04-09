@@ -22,8 +22,7 @@ export const contentLiveSync = {
     if (!browser || eventSource) return;
 
     // Do not connect on setup or login pages
-    const pathname =
-      typeof window !== "undefined" && window.location ? window.location.pathname : "";
+    const pathname = typeof window !== "undefined" ? window.location.pathname : "";
     if (pathname.startsWith("/setup") || pathname.startsWith("/login")) return;
 
     logger.debug("📡 Initializing content live sync via SSE...");
@@ -31,7 +30,6 @@ export const contentLiveSync = {
     // Connect to the events endpoint
     eventSource = new EventSource("/api/content/events");
 
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     eventSource.onmessage = async (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -42,13 +40,10 @@ export const contentLiveSync = {
           data.type === "content_update" ||
           data.type === "reorder"
         ) {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(async () => {
-            logger.info(`📡 Content update received [${data.type}]. Refreshing...`);
-            // Trigger a fast refresh (skip reconciliation on server, just sync state)
-            await contentManager.refresh(null, true);
-            debounceTimer = null;
-          }, 250); // 250ms debounce
+          logger.info(`📡 Content update received [${data.type}]. Refreshing...`);
+
+          // Trigger a fast refresh (skip reconciliation on server, just sync state)
+          await contentManager.refresh(null, true);
         }
       } catch (error) {
         logger.error("❌ Failed to parse SSE message", error);

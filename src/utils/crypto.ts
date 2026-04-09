@@ -58,19 +58,15 @@ if (isServer) {
  * These settings provide a good balance between security and performance
  * while maintaining strong resistance against both classical and quantum attacks.
  */
-// Import shared password parameters from centralized utility
-import { getPasswordConfig } from "./password";
-const pgConfig = getPasswordConfig();
-
 export const argon2Config = {
   // Memory cost in KiB (64 MB) - Makes attacks expensive even with quantum computers
-  memoryCost: pgConfig.memoryCost,
+  memory: 65_536,
   // Time cost (number of iterations) - Adds computational complexity
-  timeCost: pgConfig.timeCost,
+  time: 3,
   // Parallelism factor (number of threads) - Optimizes for modern CPUs
-  parallelism: pgConfig.parallelism,
+  parallelism: 4,
   // Use Argon2id (hybrid version - best for most use cases)
-  type: pgConfig.type,
+  type: 2 as const, // argon2id
   // Output hash length in bytes
   hashLength: 32,
 };
@@ -86,8 +82,39 @@ export const encryptionConfig = {
   authTagLength: 16, // 128 bits (provides data integrity)
 };
 
-// Re-export centralized password utilities to maintain compatibility
-export { hashPassword, verifyPassword } from "./password";
+/**
+ * Hash a password using Argon2id
+ *
+ * @param password - Plain text password to hash
+ * @returns Promise resolving to hashed password
+ * @throws Error if argon2 is not available
+ */
+export async function hashPassword(password: string): Promise<string> {
+  if (!argon2) {
+    throw new Error("Argon2 not available - server-side only");
+  }
+
+  return argon2.hash(password, {
+    ...argon2Config,
+    type: argon2.argon2id,
+  });
+}
+
+/**
+ * Verify a password against its hash using Argon2
+ *
+ * @param password - Plain text password to verify
+ * @param hash - Hashed password to compare against
+ * @returns Promise resolving to true if password matches
+ * @throws Error if argon2 is not available
+ */
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (!argon2) {
+    throw new Error("Argon2 not available - server-side only");
+  }
+
+  return argon2.verify(hash, password);
+}
 
 /**
  * Derive a cryptographic key from a password using Argon2

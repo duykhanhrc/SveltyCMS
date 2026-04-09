@@ -77,9 +77,8 @@ const validationSchema = (field: FieldInstance) => {
 // Create the widget definition using the factory.
 const RelationWidget = createWidget<RelationProps>({
   Name: "Relation",
-  Icon: "mdi:relation-many-to-many",
-  Description: widget_relation_description,
-
+  Icon: "mdi:relation-one-to-one",
+  Description: widget_relation_description(),
   inputComponent: () => import("./input.svelte"),
   inputComponentPath: "/src/widgets/core/relation/input.svelte",
   displayComponent: () => import("./display.svelte"),
@@ -187,33 +186,26 @@ const RelationWidget = createWidget<RelationProps>({
             return props.multiple ? [] : null;
           }
 
-          const { loaders } = context;
-          if (!loaders) {
-            // Fallback for cases where loaders might not be present (should not happen in optimized flows)
-            const { dbAdapter, tenantId } = context;
-            const collectionId = (target as any)?._id || props.collection;
-            const collectionName = `collection_${collectionId}`;
-            if (props.multiple && Array.isArray(value)) {
-              const result = await dbAdapter.crud.findMany(collectionName, {
-                _id: { $in: value },
-                ...(tenantId ? { tenantId } : {}),
-              });
-              return result.success ? result.data : [];
-            }
-            const result = await dbAdapter.crud.findOne(collectionName, {
-              _id: value,
-              ...(tenantId ? { tenantId } : {}),
-            });
-            return result.success ? result.data : null;
+          const { dbAdapter, tenantId } = context;
+          if (!dbAdapter) {
+            return null;
           }
 
           const collectionId = (target as any)?._id || props.collection;
-          const loader = loaders.collectionLoader.get(collectionId);
+          const collectionName = `collection_${collectionId}`;
 
           if (props.multiple && Array.isArray(value)) {
-            return Promise.all(value.map((id) => loader.load(id)));
+            const result = await dbAdapter.crud.findMany(collectionName, {
+              _id: { $in: value },
+              ...(tenantId ? { tenantId } : {}),
+            });
+            return result.success ? result.data : [];
           }
-          return loader.load(value as string);
+          const result = await dbAdapter.crud.findOne(collectionName, {
+            _id: value,
+            ...(tenantId ? { tenantId } : {}),
+          });
+          return result.success ? result.data : null;
         },
       },
     };

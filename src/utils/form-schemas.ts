@@ -61,12 +61,9 @@ const passwordSchema = pipe(
   trim(),
   minLength(
     getMinPasswordLength(),
-    `Password must be at least ${getMinPasswordLength()} characters`,
+    `Password must be at least ${getMinPasswordLength()} characters and include a letter, number, and special character`,
   ),
   custom((value) => {
-    // Skip complexity check in test mode for convenience during benchmarks
-    if (typeof process !== "undefined" && process.env?.TEST_MODE === "true") return true;
-
     const min = getMinPasswordLength();
     const regex = new RegExp(
       `^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[!@#$%^&*()_+\\-=[\\]{};':"\\\\|,.<>?]).{${min},}$`,

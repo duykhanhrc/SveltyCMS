@@ -10,7 +10,7 @@
  */
 
 import { logger } from "@utils/logger";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type {
@@ -352,8 +352,8 @@ export class AdapterCore {
    * All dynamic collections sharing a common relational structure for flexibility.
    */
   private createDynamicTableDefinition(tableName: string) {
-    const { pgTable, varchar, jsonb, timestamp } = require("drizzle-orm/pg-core");
-    const { sql } = require("drizzle-orm");
+    const { pgTable, varchar, jsonb, timestamp } = import("drizzle-orm/pg-core") as unknown as any;
+    const { sql } = import("drizzle-orm") as unknown as any;
 
     return pgTable(tableName, {
       _id: varchar("_id", { length: 36 }).primaryKey(),
@@ -383,8 +383,6 @@ export class AdapterCore {
       if (column) {
         if (value === null) {
           conditions.push(isNull(column));
-        } else if (Array.isArray(value)) {
-          conditions.push(inArray(column, value));
         } else {
           conditions.push(eq(column, value as string | number | boolean));
         }

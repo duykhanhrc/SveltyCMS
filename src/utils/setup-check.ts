@@ -1,23 +1,15 @@
 /**
  * @file src/utils/setup-check.ts
- * @description
- * **System State Discovery**: The authoritative utility for detecting if the CMS is initialized.
+ * @description Centralized and memoized setup completion check utility.
  *
- * This utility determines if we should show the Setup Wizard or the Admin Dashboard.
- *
- * ### Responsibilities:
- * - Checking for the existence of `config/private.ts`.
- * - Verifying DB connectivity and the presence of core system records (Users, Roles).
- * - Memoizing the setup status to minimize disk/DB I/O.
- *
- * ### Next Steps & Options:
- * - If `isSetupComplete()` is false, the system redirects to `/setup`.
- * - If true, the `handleSetup` hook allows normal authenticated access.
+ * @improvements
+ * - **Relative Imports:** Uses `../databases/db` instead of aliases to ensure safety when running inside `vite.config.ts`.
+ * - **Namespace Imports:** Uses `fs` and `path` namespaces for consistency with other server utilities.
+ * - **Robustness:** Stronger checks during dynamic imports.
  */
 
 import fs from "node:fs";
 import path from "node:path";
-import { logger } from "./logger.server";
 
 // Memoization variable to cache the setup status.
 let setupStatus: boolean | null = null;
@@ -150,7 +142,7 @@ export async function isSetupCompleteAsync(): Promise<boolean> {
     const hasConfig = hostConfig.success && hostConfig.data;
 
     // Log status for easier debugging of setup state
-    logger.info(
+    console.log(
       `[setupCheck] DB Status: users=${hasUsers}, roles=${hasRoles}, siteConfig=${hasConfig}`,
     );
 
@@ -160,7 +152,7 @@ export async function isSetupCompleteAsync(): Promise<boolean> {
       const missing = [];
       if (!hasUsers) missing.push("USERS");
       if (!hasRoles) missing.push("ROLES");
-      logger.warn(
+      console.warn(
         `[setupCheck] Config exists but NO ${missing.join(", ")} found in DB. System will stay in setup mode.`,
       );
       setupStatus = false;
@@ -232,11 +224,7 @@ export function isBootstrapRoute(pathname: string): boolean {
   }
 
   // 2. Auth flow (login, register, logout)
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/api/user/login")
-  ) {
+  if (pathname.startsWith("/login") || pathname.startsWith("/api/auth")) {
     return true;
   }
 
@@ -244,8 +232,6 @@ export function isBootstrapRoute(pathname: string): boolean {
   if (
     pathname.startsWith("/api/system") ||
     pathname.startsWith("/api/debug") ||
-    pathname.startsWith("/api/testing") ||
-    pathname.startsWith("/api/graphql") ||
     pathname.startsWith("/api/settings/public") ||
     pathname.startsWith("/api/content/version") ||
     pathname.startsWith("/api/dashboard/health") ||

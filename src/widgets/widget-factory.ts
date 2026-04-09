@@ -31,7 +31,7 @@ export type FieldConfig<TProps extends WidgetProps = WidgetProps> = {
  */
 export interface WidgetConfig<TProps extends WidgetProps = WidgetProps> {
   aggregations?: unknown;
-  Description?: string | (() => string);
+  Description?: string;
 
   /** Type-safe default values for the widget's custom properties. */
   defaults?: Partial<TProps>;
@@ -67,29 +67,16 @@ export interface WidgetConfig<TProps extends WidgetProps = WidgetProps> {
   inputComponentPath?: string;
 
   /** Optional function to modify the request data on the server. */
-  modifyRequest?: (args: {
-    collection: unknown;
-    collectionName?: string;
-    data: any;
-    field: FieldInstance;
-    tenantId?: string | null;
-    type: string;
-    user: unknown;
-    skipValidation?: boolean;
-    action?: string;
-  }) => Promise<void>;
+  modifyRequest?: (args: Record<string, unknown>) => Promise<Record<string, unknown>>;
 
   /** Optional function to modify a batch of request data on the server. */
   modifyRequestBatch?: (args: {
     data: Record<string, unknown>[];
     collection: unknown;
-    field: FieldInstance;
+    field: unknown;
     user: unknown;
     type: string;
     tenantId?: string | null;
-    collectionName?: string;
-    skipValidation?: boolean;
-    action?: string;
   }) => Promise<Record<string, unknown>[]>;
   Name: string;
 
@@ -198,7 +185,7 @@ export function createWidget<TProps extends WidgetProps = WidgetProps>(
   // 3. Attach metadata to the factory for compatibility with existing system
   widgetFactoryFunction.Name = config.Name;
   widgetFactoryFunction.Icon = config.Icon;
-  widgetFactoryFunction.Description = config.Description as string | undefined; // Cast for compatibility
+  widgetFactoryFunction.Description = config.Description;
   widgetFactoryFunction.GuiSchema = config.GuiSchema;
   widgetFactoryFunction.GraphqlSchema = config.GraphqlSchema;
   widgetFactoryFunction.aggregations = config.aggregations as WidgetDefinition["aggregations"];

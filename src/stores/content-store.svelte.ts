@@ -1,15 +1,9 @@
 /**
  * @file src/stores/content-store.svelte.ts
  * @description
- * **Content Central Store**: The reactive source of truth for the entire CMS node tree.
- *
- * This store manages the mapping of all collections and categories for the current tenant.
- *
- * ### Responsibilities:
- * - Reactive state for the content structure ($state).
- * - High-speed synchronization with server-loaded nodes (Circuit Breaker logic).
- * - Real-time SSE synchronization management.
- * - Path-to-Node resolution and smart collection discovery.
+ * Single Reactive Store for the SveltyCMS Content System.
+ * Replaces content-structure, content-collections, and content-polling.
+ * Uses Svelte 5 runes for tree-shakable reactivity.
  */
 import type { ContentNode, Schema, DatabaseId } from "@src/content/types";
 import { browser } from "$app/environment";
@@ -119,13 +113,8 @@ class ContentStore {
     if (!node) {
       const lowerId = identifier.toLowerCase();
       const lowerWithSlash = lowerId.startsWith("/") ? lowerId : `/${lowerId}`;
-      const lowerWithPrefix = lowerWithSlash.startsWith("/collection/")
-        ? lowerWithSlash
-        : `/collection${lowerWithSlash}`;
-
       for (const [pathKey, idValue] of this.pathMap.entries()) {
-        const lowerKey = pathKey.toLowerCase();
-        if (lowerKey === lowerId || lowerKey === lowerWithSlash || lowerKey === lowerWithPrefix) {
+        if (pathKey.toLowerCase() === lowerId || pathKey.toLowerCase() === lowerWithSlash) {
           node = this.getNode(idValue);
           break;
         }
@@ -166,15 +155,8 @@ class ContentStore {
     return Array.from(this.nodeMap.entries());
   }
 
-  private lastNodesHash = "";
-
   sync(nodes: ContentNode[]) {
-    // Prevent redundant syncs that trigger reactivity loops
-    const currentHash = JSON.stringify(nodes);
-    if (currentHash === this.lastNodesHash) return;
-    this.lastNodesHash = currentHash;
-
-    logger.debug(`[ContentStore] Syncing ${nodes.length} nodes for tenant: ${this.state}`);
+    logger.debug(`[ContentStore] Syncing ${nodes.length} nodes for tenant: ${getStore().state}`);
     this.nodeMap.clear();
     this.pathMap.clear();
 

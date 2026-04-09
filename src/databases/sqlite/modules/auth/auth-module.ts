@@ -14,7 +14,7 @@
  * - Role management
  */
 
-import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type {
   BaseQueryOptions,
   DatabaseId,
@@ -107,7 +107,7 @@ export class AuthModule implements IAuthAdapter {
       }
 
       const values: typeof schema.authUsers.$inferInsert = {
-        email: (userData.email || "").toLowerCase(),
+        email: userData.email || "",
         username: userData.username || null,
         password: password || null,
         firstName: userData.firstName || null,
@@ -156,11 +156,6 @@ export class AuthModule implements IAuthAdapter {
         ...(rest as any),
         updatedAt: now,
       };
-
-      // Normalize email if provided
-      if (updateData.email) {
-        updateData.email = updateData.email.toLowerCase();
-      }
 
       // Handle role mapping if needed
       if (userData.role) {
@@ -264,21 +259,14 @@ export class AuthModule implements IAuthAdapter {
       email: string;
       tenantId?: DatabaseId | null;
     },
-    options?: BaseQueryOptions,
+    _options?: BaseQueryOptions,
   ): Promise<DatabaseResult<User | null>> {
     return this.core.wrap(async () => {
-      const email = criteria.email.toLowerCase();
-      const conditions: SQL[] = [sql`lower(${schema.authUsers.email}) = ${email}`];
-
-      // Respect bypassTenantCheck
-      if (!options?.bypassTenantCheck) {
-        if (criteria.tenantId) {
-          conditions.push(eq(schema.authUsers.tenantId, criteria.tenantId as string));
-        } else {
-          // Find users with no tenant (null or empty string)
-          const noTenant = or(isNull(schema.authUsers.tenantId), eq(schema.authUsers.tenantId, ""));
-          if (noTenant) conditions.push(noTenant);
-        }
+      const conditions = [eq(schema.authUsers.email, criteria.email)];
+      if (criteria.tenantId) {
+        conditions.push(eq(schema.authUsers.tenantId, criteria.tenantId as string));
+      } else {
+        conditions.push(isNull(schema.authUsers.tenantId));
       }
 
       const [result] = await this.db
@@ -593,7 +581,6 @@ export class AuthModule implements IAuthAdapter {
         ...tokenData,
         _id: id,
         user_id: tokenData.user_id as string,
-        email: tokenData.email.toLowerCase(),
         tenantId: tokenData.tenantId as string | null,
         token: tokenValue,
         expires: expires as Date,
@@ -822,7 +809,7 @@ export class AuthModule implements IAuthAdapter {
         updatedAt: now,
       };
 
-      await this.db.insert(schema.roles).values(values).onConflictDoNothing();
+      await this.db.insert(schema.roles).values(values);
       const [result] = await this.db
         .select()
         .from(schema.roles)

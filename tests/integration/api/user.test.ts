@@ -48,12 +48,7 @@ describe("User API Integration", () => {
 
       const result = await response.json();
       expect(response.status).toBe(201);
-      expect(result).toMatchObject({
-        success: true,
-        data: {
-          email: uniqueEmail,
-        },
-      });
+      expect(result.email).toBe(uniqueEmail);
     });
 
     it("should reject invalid email format", async () => {
@@ -129,8 +124,8 @@ describe("User API Integration", () => {
         headers: { Cookie: adminCookie },
       });
       const result = await verify.json();
-      // /api/user?raw=true returns the array of user objects directly
-      const updatedUser = result.find((u: any) => u.username === "UpdatedAdminName");
+      // /api/user returns { success: true, data: users[], pagination: ... }
+      const updatedUser = result.data.find((u: any) => u.username === "UpdatedAdminName");
       expect(updatedUser).toBeDefined();
       expect(updatedUser.username).toBe("UpdatedAdminName");
     });
@@ -182,8 +177,8 @@ describe("User API Integration", () => {
 
       const result = await response.json();
       expect(response.status).toBe(200);
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThan(0);
+      expect(Array.isArray(result.data)).toBe(true);
+      expect(result.data.length).toBeGreaterThan(0);
     });
   });
 

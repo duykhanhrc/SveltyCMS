@@ -123,7 +123,6 @@ export const roles = pgTable(
     isAdmin: boolean("isAdmin").notNull().default(false),
     icon: varchar("icon", { length: 100 }),
     color: varchar("color", { length: 50 }),
-
     tenantId: tenantField(),
     ...timestamps,
   },

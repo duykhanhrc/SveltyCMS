@@ -113,7 +113,6 @@ export function parseJsonField<T>(value: unknown, fallback: T): T {
   return value as T;
 }
 
-import { toISOString } from "@src/utils/date-utils";
 /**
  * Convert Date objects in a record to ISO strings.
  * PostgreSQL TIMESTAMP fields come back as Date objects from postgres.js.
@@ -122,8 +121,8 @@ export function convertDatesToISO<T extends Record<string, unknown>>(obj: T): T 
   if (!obj || typeof obj !== "object") return obj;
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (value instanceof Date) {
-      result[key] = toISOString(value);
+    if (value instanceof Date && typeof value.toISOString === "function") {
+      result[key] = value.toISOString();
     } else {
       result[key] = value;
     }
@@ -136,30 +135,6 @@ export function convertDatesToISO<T extends Record<string, unknown>>(obj: T): T 
  */
 export function convertArrayDatesToISO<T extends Record<string, unknown>>(arr: T[]): T[] {
   return arr.map((item) => convertDatesToISO(item));
-}
-
-/**
- * Convert ISO strings in a record to Date objects.
- */
-export function convertISOToDates<T extends Record<string, unknown>>(obj: T): T {
-  if (!obj || typeof obj !== "object") return obj;
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (
-      typeof value === "string" &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/.test(value)
-    ) {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        result[key] = date;
-      } else {
-        result[key] = value;
-      }
-    } else {
-      result[key] = value;
-    }
-  }
-  return result as T;
 }
 
 // Normalize file paths by removing leading/trailing slashes and deduplicating slashes

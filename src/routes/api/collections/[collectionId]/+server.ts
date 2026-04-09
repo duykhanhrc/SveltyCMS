@@ -26,7 +26,7 @@ export const GET = apiHandler(async ({ params, url, locals }) => {
   }
 
   const result = await cms.collections.find(collectionId, { tenantId, limit, offset, filter });
-  return json(result);
+  return json({ success: true, data: result.data || result });
 });
 
 export const POST = apiHandler(async ({ params, request, locals }) => {

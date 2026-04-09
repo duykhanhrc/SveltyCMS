@@ -408,73 +408,27 @@ export async function seedDemoRecords(
   }
 
   try {
-    // 1. Seed "Authors"
-    const authorsSchema = collections.find((s) => s.name === "Authors");
-    if (authorsSchema && authorsSchema._id) {
-      const authors = [
-        {
-          Name: "Admin",
-          Bio: "The system administrator.",
-          status: "publish",
-          ...(tenantId && { tenantId: tenantId as DatabaseId }),
-        },
-        {
-          Name: "Editor",
-          Bio: "A content creator.",
-          status: "publish",
-          ...(tenantId && { tenantId: tenantId as DatabaseId }),
-        },
-      ];
-      await dbAdapter.crud.insertMany(authorsSchema._id, authors, {
-        tenantId: tenantId as DatabaseId,
-      });
-      logger.info(`✅ Seeded ${authors.length} demo authors into ${authorsSchema._id}`);
-    }
-
-    // 2. Seed "Categories"
-    const categoriesSchema = collections.find((s) => s.name === "Categories");
-    if (categoriesSchema && categoriesSchema._id) {
-      const categories = [
-        {
-          name: "News",
-          slug: "news",
-          description: "Latest news and updates.",
-          status: "publish",
-          ...(tenantId && { tenantId: tenantId as DatabaseId }),
-        },
-        {
-          name: "Technology",
-          slug: "technology",
-          description: "Everything tech.",
-          status: "publish",
-          ...(tenantId && { tenantId: tenantId as DatabaseId }),
-        },
-      ];
-      await dbAdapter.crud.insertMany(categoriesSchema._id, categories, {
-        tenantId: tenantId as DatabaseId,
-      });
-      logger.info(`✅ Seeded ${categories.length} demo categories into ${categoriesSchema._id}`);
-    }
-
     for (const schema of collections) {
       const collectionId = schema._id;
       if (!collectionId) {
         continue;
       }
 
-      // 3. Seed "Posts" as a demo
+      // Seed "Posts" as a demo
       if (schema.name === "Posts") {
         const posts = [
           {
-            Title: "Welcome to SveltyCMS",
-            Author: "Admin", // Assuming the relation is handled by name or needs ID
-            status: "publish",
+            title: "Welcome to SveltyCMS",
+            content: "This is your first post, created automatically during setup.",
+            status: "published",
+            author: "Admin",
             ...(tenantId && { tenantId: tenantId as DatabaseId }),
           },
           {
-            Title: "Modern CMS Architecture",
-            Author: "Admin",
-            status: "publish",
+            title: "Modern CMS Architecture",
+            content: "SveltyCMS uses Svelte 5 runes and a database-agnostic adapter pattern.",
+            status: "published",
+            author: "Admin",
             ...(tenantId && { tenantId: tenantId as DatabaseId }),
           },
         ];
@@ -492,7 +446,7 @@ export async function seedDemoRecords(
           title: `Stress Test Entry #${i}`,
           content: `Automated performance test payload for entry ${i}.`,
           metadata: { iteration: i, random: Math.random() },
-          status: "publish",
+          status: "published",
           ...(tenantId && { tenantId: tenantId as DatabaseId }),
         }));
         await dbAdapter.crud.insertMany(collectionId, stressItems, {
@@ -508,21 +462,18 @@ export async function seedDemoRecords(
             label: "Home",
             url: "/",
             order: 1,
-            status: "publish",
             ...(tenantId && { tenantId: tenantId as DatabaseId }),
           },
           {
             label: "Blog",
             url: "/blog",
             order: 2,
-            status: "publish",
             ...(tenantId && { tenantId: tenantId as DatabaseId }),
           },
           {
             label: "Contact",
             url: "/contact",
             order: 3,
-            status: "publish",
             ...(tenantId && { tenantId: tenantId as DatabaseId }),
           },
         ];
@@ -680,7 +631,7 @@ export const defaultPublicSettings: Array<{
   },
   {
     key: "HOST_PROD",
-    value: "https://SveltyCMS.com",
+    value: "https://yourdomain.com",
     description: "Production server URL",
   },
 

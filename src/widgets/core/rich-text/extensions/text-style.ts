@@ -17,7 +17,7 @@ declare module "@tiptap/core" {
   }
 }
 
-export const TextStyleExtension = TextStyle.extend({
+export default TextStyle.extend({
   addAttributes() {
     return {
       ...this.parent?.(),

@@ -159,9 +159,6 @@ export const privateConfigSchema = object({
 
   // --- Auth Configuration ---
   PASSWORD_MIN_LENGTH: optional(pipe(number(), minValue(1)), 8),
-
-  // --- CI/Benchmark Configuration ---
-  TEST_API_SECRET: optional(string()),
 });
 
 // The PUBLIC configuration for the application.

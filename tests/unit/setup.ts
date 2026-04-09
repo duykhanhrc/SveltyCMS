@@ -687,10 +687,7 @@ moduleMock("@src/utils/error-handling", () => ({
   wrapError,
   handleApiError: mock((err: any) => {
     const status = err?.status || (isHttpError(err) ? (err as any).status : 500);
-    // Don't log expected errors during tests unless requested
-    if (status >= 500 && process.env.VERBOSE_TEST !== "true") {
-      // Quiet mode for tests
-    } else if (status >= 500) {
+    if (status >= 500) {
       console.error("--- handleApiError Details:", {
         message: getErrorMessage(err),
         status,
@@ -720,10 +717,7 @@ moduleMock("@utils/error-handling", () => ({
   wrapError,
   handleApiError: mock((err: any) => {
     const status = err?.status || (isHttpError(err) ? (err as any).status : 500);
-    // Don't log expected errors during tests unless requested
-    if (status >= 500 && process.env.VERBOSE_TEST !== "true") {
-      // Quiet mode for tests
-    } else if (status >= 500) {
+    if (status >= 500) {
       console.error("--- handleApiError Details:", {
         message: getErrorMessage(err),
         status,
@@ -995,7 +989,6 @@ const dbMock = {
   media: mockDbAdapter.media,
   system: mockDbAdapter.system,
   loadSettingsFromDB: mock(() => Promise.resolve(true)),
-  isAuthReady: () => true,
 };
 moduleMock("@src/databases/db", () => dbMock);
 moduleMock("@databases/db", () => dbMock);
@@ -1025,18 +1018,17 @@ const SetupState = {
   COMPLETE: "COMPLETE",
 };
 
-let setupStateValue = SetupState.COMPLETE;
+let isSetupCompleteValue = true;
 const mockSetupCheck = {
-  isSetupComplete: mock(() => setupStateValue === SetupState.COMPLETE),
-  isSetupCompleteAsync: mock(async () => setupStateValue === SetupState.COMPLETE),
-  getSetupState: mock(async () => setupStateValue),
+  isSetupComplete: mock(() => isSetupCompleteValue),
+  isSetupCompleteAsync: mock(async () => isSetupCompleteValue),
+  getSetupState: mock(async () =>
+    isSetupCompleteValue ? SetupState.COMPLETE : SetupState.MISSING_CONFIG,
+  ),
   SetupState,
   invalidateSetupCache: mock(() => {}),
   setSetupComplete: mock((val: boolean) => {
-    setupStateValue = val ? SetupState.COMPLETE : SetupState.MISSING_CONFIG;
-  }),
-  setSetupState: mock((state: any) => {
-    setupStateValue = state;
+    isSetupCompleteValue = val;
   }),
   isBootstrapRoute: mock((p: string) => {
     const path = p.startsWith("/") ? p.slice(1) : p;

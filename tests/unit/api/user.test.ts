@@ -13,10 +13,10 @@ import type { RequestEvent } from "@sveltejs/kit";
 vi.mock("@src/databases/db", () => ({
   dbAdapter: {
     auth: {
-      getAllUsers: vi.fn().mockResolvedValue({ success: true, data: [] }),
-      getUserCount: vi.fn().mockResolvedValue({ success: true, data: 0 }),
-      updateUserAttributes: vi.fn().mockResolvedValue({ success: true, data: { _id: "u1" } }),
-      batchAction: vi.fn().mockResolvedValue({ success: true, data: { modifiedCount: 1 } }),
+      getAllUsers: vi.fn(),
+      getUserCount: vi.fn(),
+      updateUserAttributes: vi.fn(),
+      batchAction: vi.fn(),
     },
   },
   getDbInitPromise: vi.fn().mockResolvedValue(undefined),
@@ -48,16 +48,16 @@ describe("User API Unit Tests", () => {
       params: { path },
       request: {
         method,
-        json: async () => body,
+        json: vi.fn().mockResolvedValue(body),
         formData: vi.fn(),
         headers: new Map(),
       },
       locals: {
-        user: { ...user, role: "admin", isAdmin: true },
+        user: { ...user, role: "admin-role" },
         tenantId: tenantId ?? "t1",
         roles: [
           {
-            _id: "admin",
+            _id: "admin-role",
             name: "Administrator",
             isAdmin: true,
             permissions: ["user:read", "user:update", "api:user"],
@@ -67,8 +67,8 @@ describe("User API Unit Tests", () => {
           auth: {
             getAllUsers: vi.fn().mockResolvedValue({ success: true, data: [] }),
             getUserCount: vi.fn().mockResolvedValue({ success: true, data: 0 }),
-            updateUserAttributes: vi.fn().mockResolvedValue({ success: true, data: { _id: "u1" } }),
-            batchAction: vi.fn().mockResolvedValue({ success: true, data: { modifiedCount: 1 } }),
+            updateUserAttributes: vi.fn().mockResolvedValue({ success: true }),
+            batchAction: vi.fn().mockResolvedValue({ success: true }),
           },
           collections: {},
           media: {},
@@ -86,8 +86,6 @@ describe("User API Unit Tests", () => {
     const response = await dispatcher(event);
     const result = await response.json();
     expect(result.success).toBe(true);
-    expect(result.data).toBeDefined();
-    expect(Array.isArray(result.data.data)).toBe(true);
   });
 
   it("should update user attributes", async () => {

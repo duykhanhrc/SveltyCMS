@@ -1564,9 +1564,7 @@ async function signInUser(
         };
       }
     } else {
-      // Fix: Pass null instead of undefined for tenantId in non-multi-tenant setup
-      // This ensures the database adapter correctly queries the global tenant
-      const authResult = await auth.authenticate(email, password, null, {
+      const authResult = await auth.authenticate(email, password, undefined, {
         bypassTenantCheck: true,
       });
       if (authResult?.user) {

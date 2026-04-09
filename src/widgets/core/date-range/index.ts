@@ -28,6 +28,7 @@ interface AggregationField {
 }
 
 //ParaglideJS
+import { widget_dateRange_description } from "@src/paraglide/messages";
 import {
   check,
   isoTimestamp,
@@ -55,7 +56,7 @@ const DATE_RANGE_VALIDATION_SCHEMA = pipe(
 const DateRangeWidget = createWidget<DateRangeProps>({
   Name: "DateRange",
   Icon: "mdi:calendar-range",
-  Description: "A widget for selecting a date range with start and end dates.",
+  Description: widget_dateRange_description(),
 
   // Define paths to the dedicated Svelte components.
   inputComponent: () => import("./input.svelte"),

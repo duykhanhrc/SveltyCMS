@@ -49,20 +49,11 @@ let activeIndex = $state(-1);
 let listElement = $state<HTMLElement>();
 let inputElement = $state<HTMLInputElement>();
 
-// Fuzzy search logic with deduplication
+// Fuzzy search logic
 const filteredOptions = $derived.by(() => {
-	const uniqueMap = new Map();
-	const baseOptions = options.filter(opt => {
-		if (opt.value !== undefined && !uniqueMap.has(opt.value)) {
-			uniqueMap.set(opt.value, true);
-			return true;
-		}
-		return false;
-	});
-
-	if (!searchTerm.trim()) return baseOptions;
+	if (!searchTerm.trim()) return options;
 	const term = searchTerm.toLowerCase();
-	return baseOptions
+	return options
 		.map(opt => {
 			const label = opt.label.toLowerCase();
 			let score = 0;

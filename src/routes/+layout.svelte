@@ -1,21 +1,15 @@
 <!--
-@file src/routes/+layout.svelte
-@component
-**Global Root Layout**: The primary entry point for the entire application.
+ @file src/routes/+layout.svelte
+ @component
+ **Global layout for the entire application**
 
-This layout initializes the most critical global states (i18n, Theme, Settings).
-
-### Responsibilities:
-- Paraglide i18n initialization and language bridging.
-- Skeleton v4 global UI components (Toasts, Modals).
-- WebMCP Support for peripheral tool registration.
-- Zero-latency content system hydration and SSE start.
-
-### Next Steps & Options:
-- Navigate to dashboard or collection views.
-- Access global search (Mod+K).
-- Change site-wide theme or language.
--->
+ ### Features
+ - Paraglide i18n integration
+ - Theme Management
+ - Skeleton v4 Toasts & Modals
+ - WebMCP Support
+ - Flash Messaging
+ -->
 
 <script lang="ts">
 // Selected theme
@@ -44,10 +38,6 @@ import CookieConsent from "@src/plugins/cookie-consent/cookie-consent.svelte";
 import { initWebMCP } from "@src/plugins/webmcp/index";
 // Global Settings
 import { initPublicEnv, publicEnv } from "@src/stores/global-settings.svelte";
-import {
-	globalLoadingStore,
-	loadingOperations,
-} from "@src/stores/loading-store.svelte";
 // Skeleton v4
 import { app } from "@src/stores/store.svelte.ts";
 import { toast } from "@src/stores/toast.svelte.ts";
@@ -87,28 +77,16 @@ import { initializeContent } from "@src/content";
 
 // Initialize public environment settings from server data
 // Note: Only access page.data after mount to avoid hydration issues
-if (browser) {
-	globalLoadingStore.startLoading(loadingOperations.initialization);
-}
-
 $effect(() => {
 	if (browser && page.data) {
-		untrack(() => {
-			if (page.data.settings) {
-				initPublicEnv(page.data.settings);
-			}
-			if (page.data.navigationStructure) {
-				setContentStructure(page.data.navigationStructure);
-				// Initialize the modern content system with hydration data
-				initializeContent(page.data as any);
-				// Mark initialization as finished successfully here
-				globalLoadingStore.stopLoading(loadingOperations.initialization);
-			} else if (page.data.user === null) {
-				// If no user and no structure, we might be on a setup/login page
-				// Clear initialization to allow the page to render
-				globalLoadingStore.stopLoading(loadingOperations.initialization);
-			}
-		});
+		if (page.data.settings) {
+			initPublicEnv(page.data.settings);
+		}
+		if (page.data.navigationStructure) {
+			setContentStructure(page.data.navigationStructure);
+			// Initialize the modern content system with hydration data
+			initializeContent(page.data as any);
+		}
 	}
 });
 

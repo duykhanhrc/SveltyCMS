@@ -1,61 +1,46 @@
-# 🔧 SveltyCMS Codemods
+# @file scripts\codemods\2026-migrate-schema.ts
 
-> **Automatic code migrations** that run during `bun run upgrade`
+# SveltyCMS Codemods
 
-## How It Works
+Codemods are small scripts that automate code transformations after an upgrade. They help in handling breaking changes, renaming properties, or updating schema patterns.
 
-When you run `bun run upgrade`, the system automatically executes **every** `.ts` file in this directory in alphabetical order, **excluding** any files that start with an underscore (`_`).
+## How it works
 
-## Adding a New Codemod
+When you run `bun run scripts/upgrade.ts`, the tool automatically scans this directory for `.ts` and `.js` files and executes them in order.
 
-1. Create a new file with naming: `NN-description.ts` (e.g., `04-add-new-field.ts`)
-2. Import utilities from `./_utils.ts`
-3. Implement your migration logic
-4. **Always create backups** before modifying files using `await backupFile(filePath)`
+## Writing a Codemod
 
-## Best Practices
+A codemod can be any valid script. For complex transformations, we recommend using `ts-morph` or `jscodeshift`.
 
-### ✅ DO:
+### Simple Example (Using Node.js fs)
 
-- Use shared utilities from `./_utils.ts`.
-- Create backups with `await backupFile(filePath)`.
-- Make migrations **idempotent** (safe to run multiple times).
-- Log what you're changing clearly.
-- Exit with code 0 if nothing to migrate.
+```typescript
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
-### ❌ DON'T:
+const filePath = join(process.cwd(), "src/app.css");
+let content = readFileSync(filePath, "utf-8");
 
-- Modify files without backups.
-- Assume the migration runs only once.
-- Delete user data without explicit instruction.
-- Create breaking changes without warning.
+// Rename a class
+content = content.replace(".old-class", ".new-class");
 
-## File Naming Convention
+writeFileSync(filePath, content);
+console.log("✅ Updated app.css");
+```
 
-| Prefix           | Purpose                           | Example                  |
-| ---------------- | --------------------------------- | ------------------------ |
-| `NN-`            | Execution order (01, 02, 03...)   | `01-migrate-fields.ts`   |
-| `migrate-`       | Data structure migrations         | `migrate-collections.ts` |
-| `update-`        | Configuration updates             | `update-permissions.ts`  |
-| `fix-`           | Bug fixes in schema               | `fix-role-names.ts`      |
-| `_` (underscore) | Internal utilities (NOT executed) | `_utils.ts`              |
+### Advanced Example (Using ts-morph)
 
-## Current Codemods
+If you have `ts-morph` installed, you can perform AST-based transformations:
 
-| File                                 | Description               | Status      | Safe to Re-run |
-| ------------------------------------ | ------------------------- | ----------- | -------------- |
-| `01-migrate-collection-schema-v2.ts` | v1 → v2 collection schema | ✅ Active   | ✅ Yes         |
-| `_utils.ts`                          | Shared utilities          | 📦 Internal | N/A            |
+```typescript
+import { Project } from "ts-morph";
 
-## Testing a Codemod
+const project = new Project();
+project.addSourceFilesAtPaths("src/**/*.svelte");
 
-```bash
-# Test on a single file first
-bun scripts/codemods/01-migrate-collection-schema-v2.ts src/collections/test-collection.ts
+for (const sourceFile of project.getSourceFiles()) {
+  // Perform AST transformations
+}
 
-# Dry run (if supported)
-bun run upgrade --dry-run
-
-# Full upgrade with all codemods
-bun run upgrade
+project.save();
 ```

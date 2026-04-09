@@ -39,7 +39,6 @@ export interface MetricsReport {
   api: {
     requests: number;
     errors: number;
-    cacheHits: number;
     l1Hits: number;
     l2Hits: number;
     cacheMisses: number;
@@ -246,7 +245,6 @@ class MetricsService {
       api: {
         requests: c.api.requests,
         errors: c.api.errors,
-        cacheHits: c.api.l1Hits + c.api.l2Hits,
         l1Hits: c.api.l1Hits,
         l2Hits: c.api.l2Hits,
         cacheMisses: c.api.cacheMisses,

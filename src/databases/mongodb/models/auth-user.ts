@@ -130,16 +130,11 @@ export class UserAdapter {
     options: BaseQueryOptions = {},
   ): Promise<DatabaseResult<User>> {
     try {
-      const normalizedData = { ...userData };
-      if (normalizedData.email) {
-        normalizedData.email = normalizedData.email.toLowerCase();
-      }
-
       const filter = safeQuery({ _id: userId } as any, options.tenantId as string, {
         bypassTenantCheck: options.bypassTenantCheck,
       });
 
-      const user = await this.UserModel.findOneAndUpdate(filter, normalizedData, {
+      const user = await this.UserModel.findOneAndUpdate(filter, userData, {
         returnDocument: "after",
       }).lean();
 

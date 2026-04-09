@@ -125,11 +125,6 @@ export class PreviewService {
       resolvedPath += `${separator}tenantId=${tenantId}`;
     }
 
-    // If pattern is already an absolute URL, ignore baseUrl
-    if (resolvedPath.startsWith("http://") || resolvedPath.startsWith("https://")) {
-      return resolvedPath;
-    }
-
     return baseUrl.endsWith("/") && resolvedPath.startsWith("/")
       ? baseUrl + resolvedPath.slice(1)
       : baseUrl + resolvedPath;

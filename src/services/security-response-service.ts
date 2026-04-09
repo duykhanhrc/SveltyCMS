@@ -61,16 +61,10 @@ const DEFAULT_POLICIES: SecurityPolicy[] = [
 
 const ENDPOINT_RATE_LIMITS: Record<string, number> = {
   "/api/auth/login": 5,
-  "/api/auth/2fa/verify": 5,
   "/api/auth/saml/acs": 10,
   "/api/auth/register": 3,
   "/api/auth/forgot-password": 3,
   "/api/scim/v2": 30,
-  "/api/media/upload": 20,
-  "/api/token/create-token": 5,
-  "/api/website-tokens": 30,
-  "/api/permission/update": 30,
-  "/api/collections": 100,
 };
 
 const GLOBAL_RATE_LIMIT = 100;
@@ -193,7 +187,7 @@ class SecurityResponseService {
     const url = new URL(request.url);
     let maxThreat: ThreatLevel = "none";
 
-    // 1. Scan URL
+    // Scan URL
     const urlThreat = this.checkValue(
       `${url.pathname} ${url.search}`,
       url.pathname.includes("/scim/"),
@@ -201,7 +195,7 @@ class SecurityResponseService {
     if (urlThreat === "critical") return "critical";
     maxThreat = this.upgradeThreat(maxThreat, urlThreat);
 
-    // 2. Scan User Agent
+    // Scan User Agent
     const userAgent = request.headers.get("user-agent") || "";
     for (const pattern of SECURITY_PATTERNS.suspicious_ua) {
       if (pattern.test(userAgent)) {
@@ -210,9 +204,8 @@ class SecurityResponseService {
       }
     }
 
-    // 3. Scan Body (Only for state-changing methods)
-    const mutationMethods = ["POST", "PUT", "PATCH", "DELETE"];
-    if (mutationMethods.includes(request.method) && request.body) {
+    // Scan Body (Structured)
+    if (request.method !== "GET" && request.method !== "HEAD" && request.body) {
       const contentLength = parseInt(request.headers.get("content-length") || "0", 10);
       if (contentLength > MAX_BODY_SIZE) return "high"; // Early reject oversized payloads
 
@@ -221,27 +214,30 @@ class SecurityResponseService {
           const contentType = request.headers.get("content-type") || "";
           const clone = request.clone();
 
-          if (contentType.includes("application/json") && contentLength < SCAN_BODY_MAX_SIZE * 2) {
-            const json = await clone.json().catch(() => ({}));
+          if (contentType.includes("application/json")) {
+            const json = await clone.json();
             maxThreat = this.upgradeThreat(maxThreat, this.scanRecursive(json));
           } else if (
             contentType.includes("application/x-www-form-urlencoded") ||
             contentType.includes("multipart/form-data")
           ) {
-            const formData = await clone.formData().catch(() => new FormData());
+            const formData = await clone.formData();
             for (const value of formData.values()) {
               if (typeof value === "string") {
                 maxThreat = this.upgradeThreat(maxThreat, this.checkValue(value));
                 if (maxThreat === "critical") break;
               }
             }
-          } else if (contentLength < SCAN_BODY_MAX_SIZE) {
+          } else {
             // Fallback text scan for unknown types, with strict length cap
-            const text = await clone.text().catch(() => "");
-            maxThreat = this.upgradeThreat(maxThreat, this.checkValue(text));
+            const text = await clone.text();
+            maxThreat = this.upgradeThreat(
+              maxThreat,
+              this.checkValue(text.substring(0, SCAN_BODY_MAX_SIZE)),
+            );
           }
         } catch (err) {
-          logger.debug("Safe payload scan failed (non-blocking)", { error: err });
+          logger.debug("Payload scan failed", { error: err });
         }
       }
     }

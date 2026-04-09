@@ -29,9 +29,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
     const wrappedMethods: Partial<ICrudAdapter> = {
       insert: async (...args) => {
         const res = await capturedCrud.insert(...args);
-        const collection = args[0] as string;
-        const options = args[2] as any;
-        const tenantId = options?.tenantId;
+        const [collection, , tenantId] = args as [string, any, string];
         if (
           res.success &&
           (collection.startsWith(CONTENT_COLLECTION_PREFIX) || collection === "MediaItem")
@@ -44,9 +42,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       insertMany: async (...args) => {
         const res = await capturedCrud.insertMany(...args);
-        const collection = args[0] as string;
-        const options = args[2] as any;
-        const tenantId = options?.tenantId;
+        const [collection, , tenantId] = args as [string, any[], string];
         if (res.success && collection.startsWith(CONTENT_COLLECTION_PREFIX)) {
           for (const item of res.data) {
             webhookService.trigger("entry:create", { collection, data: item as any }, tenantId);
@@ -57,11 +53,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       update: async (...args) => {
         const res = await capturedCrud.update(...args);
-        const collection = args[0] as string;
-        const id = args[1] as any;
-        const data = args[2] as any;
-        const options = args[3] as any;
-        const tenantId = options?.tenantId;
+        const [collection, id, data, tenantId] = args as [string, any, any, string];
         if (res.success && collection.startsWith(CONTENT_COLLECTION_PREFIX)) {
           let event: WebhookEvent = "entry:update";
           if ("status" in (data as any)) {
@@ -84,11 +76,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       updateMany: async (...args) => {
         const res = await capturedCrud.updateMany(...args);
-        const collection = args[0] as string;
-        const query = args[1] as any;
-        const data = args[2] as any;
-        const options = args[3] as any;
-        const tenantId = options?.tenantId;
+        const [collection, query, data, tenantId] = args as [string, any, any, string];
         if (res.success && collection.startsWith(CONTENT_COLLECTION_PREFIX)) {
           webhookService.trigger(
             "entry:update",
@@ -110,10 +98,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       delete: async (...args) => {
         const res = await capturedCrud.delete(...args);
-        const collection = args[0] as string;
-        const id = args[1] as any;
-        const options = args[2] as any;
-        const tenantId = options?.tenantId;
+        const [collection, id, tenantId] = args as [string, any, string];
         if (
           res.success &&
           (collection.startsWith(CONTENT_COLLECTION_PREFIX) || collection === "MediaItem")
@@ -126,10 +111,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       deleteMany: async (...args) => {
         const res = await capturedCrud.deleteMany(...args);
-        const collection = args[0] as string;
-        const query = args[1] as any;
-        const options = args[2] as any;
-        const tenantId = options?.tenantId;
+        const [collection, query, tenantId] = args as [string, any, string];
         if (res.success && collection.startsWith(CONTENT_COLLECTION_PREFIX)) {
           webhookService.trigger(
             "entry:delete",
@@ -146,10 +128,7 @@ export async function wrapAdapterWithWebhooks(adapter: IDBAdapter): Promise<IDBA
       },
       upsert: async (...args) => {
         const res = await capturedCrud.upsert(...args);
-        const collection = args[0] as string;
-        const query = args[1] as any;
-        const options = args[3] as any;
-        const tenantId = options?.tenantId;
+        const [collection, query, , tenantId] = args as [string, any, any, string];
         if (res.success && collection.startsWith(CONTENT_COLLECTION_PREFIX)) {
           webhookService.trigger(
             "entry:update",

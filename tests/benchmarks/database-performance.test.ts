@@ -4,9 +4,6 @@
  * Measures real-world latencies using our internal adapter abstraction.
  */
 
-// Tell Mongoose to ignore the Bun/Jest/JSDOM environment globals
-process.env.SUPPRESS_JEST_WARNINGS = "true";
-
 // 1. Initialize Mocks
 import "../unit/setup.ts";
 import { performance } from "node:perf_hooks";
@@ -14,7 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 const ITERATIONS = 100;
-const RESULTS_DIR = process.env.RESULTS_DIR || path.join(process.cwd(), "tests/benchmarks/results");
+const RESULTS_DIR = path.join(process.cwd(), "tests/benchmarks/results");
 
 async function runDatabaseBenchmark() {
   console.log("\n🚀 SveltyCMS Adapter Performance Benchmark");
