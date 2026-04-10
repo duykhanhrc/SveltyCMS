@@ -87,7 +87,7 @@ async function run() {
 
       if (!isCollectionSchema(sourceFile)) continue;
 
-      const defaultExport = sourceFile.getExportAssignment((exp) => !exp.isExportEquals());
+      const defaultExport = sourceFile.getExportAssignment((exp: any) => !exp.isExportEquals());
       if (!defaultExport) continue;
 
       const schemaObj = defaultExport.getExpressionIfKind(SyntaxKind.ObjectLiteralExpression);

@@ -208,6 +208,7 @@
     "svelte-preprocess": "^6.0.3",
     "sveltekit-rate-limiter": "^0.7.0",
     "tailwindcss": "^4.2.2",
+    "ts-morph": "^25.0.0",
     "tslib": "^2.8.1",
     "ultracite": "^7.4.3",
     "vite": "^8.0.3",

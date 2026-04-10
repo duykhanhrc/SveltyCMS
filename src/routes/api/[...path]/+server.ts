@@ -234,18 +234,16 @@ const dispatch = async ({ request, url, params, locals, cookies }: RequestEvent)
 
   // --- API AUTHORIZATION CHECK ---
   // Ensure the user has granular permission for the requested endpoint
-  const isTestMode = process.env.TEST_MODE === "true" || process.env.VITE_TEST_MODE === "true";
-  const isAuthorized =
-    isTestMode ||
-    checkEndpointPermission(
-      user,
-      (locals as any).roles || [],
-      request.method,
-      namespace,
-      method,
-      _entryId,
-      segments,
-    );
+  // NOTE: NEVER bypass permission checks in TEST_MODE - security tests depend on this!
+  const isAuthorized = checkEndpointPermission(
+    user,
+    (locals as any).roles || [],
+    request.method,
+    namespace,
+    method,
+    _entryId,
+    segments,
+  );
 
   if (!isAuthorized) {
     logger.warn(`Forbidden API access attempt: ${request.method} ${path} by user ${user?._id}`);
