@@ -334,7 +334,7 @@ jobs:
           for i in {1..90}; do
             curl -s http://127.0.0.1:4173/api/system/health && break || sleep 1
           done
-          bun run scripts/setup-system.ts
+          WAIT_TIMEOUT_MS=120000 bun run scripts/setup-system.ts
           bun x playwright test --project=wizard
       - uses: actions/upload-artifact@v7
         if: always()
@@ -384,7 +384,7 @@ jobs:
           for i in {1..90}; do
             curl -s http://127.0.0.1:4173/api/system/health && break || sleep 1
           done
-          bun run scripts/setup-system.ts
+          WAIT_TIMEOUT_MS=120000 bun run scripts/setup-system.ts
           bun x playwright test --project=auth-setup
       - uses: actions/upload-artifact@v7
         if: always()
@@ -447,7 +447,7 @@ jobs:
           for i in {1..90}; do
             curl -s http://127.0.0.1:4173/api/system/health && break || sleep 1
           done
-          bun run scripts/setup-system.ts
+          WAIT_TIMEOUT_MS=120000 bun run scripts/setup-system.ts
           bun x playwright test --project=${{ matrix.project }}
 
       - uses: actions/upload-artifact@v7
@@ -541,7 +541,7 @@ jobs:
           # Wait for server health using curl
           for i in {1..60}; do curl -s http://127.0.0.1:4173/api/system/health && break || sleep 1; done
           # Run system setup via API
-          bun run scripts/setup-system.ts
+          WAIT_TIMEOUT_MS=120000 bun run scripts/setup-system.ts
 
       - name: Run Performance Suite
         env:
