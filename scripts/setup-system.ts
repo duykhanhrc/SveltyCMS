@@ -36,7 +36,9 @@ import { join } from "node:path";
 // ---------------------------------------------------------------------------
 
 const cfg = {
-  apiBase: process.env.API_BASE_URL ?? "http://localhost:4173",
+  // Use 127.0.0.1 explicitly — on Linux "localhost" often resolves to ::1 (IPv6)
+  // while preview servers bind to 127.0.0.1 (IPv4), causing ECONNREFUSED.
+  apiBase: process.env.API_BASE_URL ?? process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://127.0.0.1:4173",
   apiSecret: process.env.TEST_API_SECRET ?? "",
   rootDir: process.cwd(),
 

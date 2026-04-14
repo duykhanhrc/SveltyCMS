@@ -39,6 +39,15 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   // Setup wizard can take time due to DB initialization/seeding
   test.setTimeout(180_000);
 
+  // Pre-accept cookie consent so the banner never blocks interactions.
+  // The store reads `sveltycms_consent` from localStorage on mount.
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "sveltycms_consent",
+      JSON.stringify({ responded: true, analytics: false, marketing: false }),
+    );
+  });
+
   // 1. Start at root, expect redirect to /setup
   await page.goto("/", { waitUntil: "networkidle" });
   await page.waitForLoadState("networkidle");
@@ -56,14 +65,6 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   await expect(page).toHaveURL(/\/setup/);
   await page.waitForLoadState("networkidle");
   await page.waitForTimeout(5000); // Hard wait for page to fully render and modals to appear
-
-  // Dismiss cookie consent banner if present (e.g. "Accept All")
-  const cookieAcceptBtn = page.getByRole("button", { name: /accept all/i });
-  if (await cookieAcceptBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    console.log("Cookie consent banner detected. Clicking Accept All...");
-    await cookieAcceptBtn.click();
-    await page.waitForTimeout(300);
-  }
 
   console.log("Starting setup wizard...");
 
@@ -97,92 +98,96 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
     await dismissBtn.click();
   }
 
-  console.log("Starting Step 1: Database Configuration...");
+  // --- STEP 1: Database Configuration (skip if already locked) ---
+  // If config/private.ts already exists, the wizard auto-advances to the Admin step.
+  // Detect which step is active before deciding whether to fill DB fields.
+  const adminH2 = page.locator("h2", { hasText: /admin/i }).first();
+  const dbAlreadyConfigured = await adminH2.isVisible({ timeout: 5000 }).catch(() => false);
 
-  // --- STEP 1: Database ---
-  await expect(page.locator("h2", { hasText: /database/i }).first()).toBeVisible({
-    timeout: 30_000,
-  });
+  if (dbAlreadyConfigured) {
+    console.log("DB already configured (config locked) — skipping database step.");
+  } else {
+    console.log("Starting Step 1: Database Configuration...");
 
-  // --- STEP 1: Database Configuration ---
-  console.log("Step 1: Database Configuration...");
+    await expect(page.locator("h2", { hasText: /database/i }).first()).toBeVisible({
+      timeout: 30_000,
+    });
 
-  // Select SQLite (default for E2E tests)
-  const dbType = process.env.DB_TYPE || "sqlite";
-  const dbHost = process.env.DB_HOST || (dbType === "sqlite" ? "config/database" : "localhost");
-  const dbName =
-    process.env.DB_NAME || (dbType === "sqlite" ? "sveltycms_test.db" : "sveltycms_test");
+    // Select SQLite (default for E2E tests)
+    const dbType = process.env.DB_TYPE || "sqlite";
+    const dbHost = process.env.DB_HOST || (dbType === "sqlite" ? "config/database" : "localhost");
+    const dbName =
+      process.env.DB_NAME || (dbType === "sqlite" ? "sveltycms_test.db" : "sveltycms_test");
 
-  // Default ports for different database types
-  const defaultPorts: Record<string, string> = {
-    mariadb: "3306",
-    mysql: "3306",
-    postgresql: "5432",
-    postgres: "5432",
-    mongodb: "27017",
-    mongo: "27017",
-  };
-  const dbPort = process.env.DB_PORT || defaultPorts[dbType] || "";
+    // Default ports for different database types
+    const defaultPorts: Record<string, string> = {
+      mariadb: "3306",
+      mysql: "3306",
+      postgresql: "5432",
+      postgres: "5432",
+      mongodb: "27017",
+      mongo: "27017",
+    };
+    const dbPort = process.env.DB_PORT || defaultPorts[dbType] || "";
 
-  const dbUser =
-    process.env.DB_USER !== undefined ? process.env.DB_USER : dbType === "sqlite" ? "" : "test";
-  const dbPass =
-    process.env.DB_PASSWORD !== undefined
-      ? process.env.DB_PASSWORD
-      : dbType === "sqlite"
-        ? ""
-        : "test";
-  const dbAuthSource = process.env.DB_AUTH_SOURCE || "";
+    const dbUser =
+      process.env.DB_USER !== undefined ? process.env.DB_USER : dbType === "sqlite" ? "" : "test";
+    const dbPass =
+      process.env.DB_PASSWORD !== undefined
+        ? process.env.DB_PASSWORD
+        : dbType === "sqlite"
+          ? ""
+          : "test";
+    const dbAuthSource = process.env.DB_AUTH_SOURCE || "";
 
-  const dbTypeSelect = page.getByTestId("db-type");
-  await dbTypeSelect.selectOption(dbType);
+    const dbTypeSelect = page.getByTestId("db-type");
+    await dbTypeSelect.selectOption(dbType);
 
-  await page.getByTestId("db-host").fill(dbHost);
-  await page.getByTestId("db-name").fill(dbName);
+    await page.getByTestId("db-host").fill(dbHost);
+    await page.getByTestId("db-name").fill(dbName);
 
-  // Fill User/Pass/Port if not SQLite
-  if (dbType !== "sqlite") {
-    if (dbPort) await page.getByTestId("db-port").fill(dbPort);
-    await page.getByTestId("db-user").fill(dbUser);
-    await page.getByTestId("db-password").fill(dbPass);
-    if (dbAuthSource) await page.getByTestId("db-auth-source").fill(dbAuthSource);
-  }
+    // Fill User/Pass/Port if not SQLite
+    if (dbType !== "sqlite") {
+      if (dbPort) await page.getByTestId("db-port").fill(dbPort);
+      await page.getByTestId("db-user").fill(dbUser);
+      await page.getByTestId("db-password").fill(dbPass);
+      if (dbAuthSource) await page.getByTestId("db-auth-source").fill(dbAuthSource);
+    }
 
-  // Click Test Database and handle SQLite "create missing" modal
-  const testDbButton = page.getByRole("button", { name: /test database/i });
-  await testDbButton.click({ force: true });
-  await page.waitForTimeout(1000); // Wait for connection test to complete
-
-  // Handle "Database does not exist" confirmation for SQLite
-  const confirmBtn = page.getByRole("button", { name: /yes/i });
-  try {
-    // Wait up to 10s for the modal to appear (SQLite only)
-    await expect(confirmBtn).toBeVisible({ timeout: 10000 });
-    console.log("Database missing modal detected. Confirming creation...");
-    await confirmBtn.click({ force: true });
-  } catch {
-    console.log(
-      "No 'Database missing' modal appeared (or not SQLite). Proceeding to check success...",
-    );
-  }
-
-  // Expect success message with a generous timeout for DB creation/I/O
-  const successMsg = page.getByText(/success/i).first();
-  try {
-    await expect(successMsg).toBeVisible({ timeout: 45000 });
-    console.log("Database connection successful.");
-  } catch {
-    console.warn("Initial Success message not found. Retrying Test Database click...");
+    // Click Test Database and handle SQLite "create missing" modal
+    const testDbButton = page.getByRole("button", { name: /test database/i });
     await testDbButton.click({ force: true });
-    await expect(successMsg).toBeVisible({ timeout: 45000 });
-  }
+    await page.waitForTimeout(1000); // Wait for connection test to complete
 
-  await clickNext(page);
+    // Handle "Database does not exist" confirmation for SQLite
+    const confirmBtn = page.getByRole("button", { name: /yes/i });
+    try {
+      // Wait up to 10s for the modal to appear (SQLite only)
+      await expect(confirmBtn).toBeVisible({ timeout: 10000 });
+      console.log("Database missing modal detected. Confirming creation...");
+      await confirmBtn.click({ force: true });
+    } catch {
+      console.log(
+        "No 'Database missing' modal appeared (or not SQLite). Proceeding to check success...",
+      );
+    }
+
+    // Expect success message with a generous timeout for DB creation/I/O
+    const successMsg = page.getByText(/success/i).first();
+    try {
+      await expect(successMsg).toBeVisible({ timeout: 45000 });
+      console.log("Database connection successful.");
+    } catch {
+      console.warn("Initial Success message not found. Retrying Test Database click...");
+      await testDbButton.click({ force: true });
+      await expect(successMsg).toBeVisible({ timeout: 45000 });
+    }
+
+    await clickNext(page);
+  }
 
   // --- STEP 2: Admin User ---
-  await expect(page.locator("h2", { hasText: /admin/i }).first()).toBeVisible({
-    timeout: 60_000,
-  });
+  await expect(adminH2).toBeVisible({ timeout: 60_000 });
 
   // Fill admin user details
   console.log("Step 2: Admin User Configuration...");
