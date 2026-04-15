@@ -324,6 +324,11 @@ jobs:
       - name: Run Wizard E2E tests
         env:
           DB_TYPE: sqlite
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: sveltycms_test
+          DB_USER: testuser
+          DB_PASSWORD: testpass
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
@@ -375,6 +380,11 @@ jobs:
       - name: Run Auth Setup E2E tests
         env:
           DB_TYPE: sqlite
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: sveltycms_test
+          DB_USER: testuser
+          DB_PASSWORD: testpass
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
@@ -438,6 +448,11 @@ jobs:
       - name: Run E2E tests
         env:
           DB_TYPE: sqlite
+          DB_HOST: localhost
+          DB_PORT: "5432"
+          DB_NAME: sveltycms_test
+          DB_USER: testuser
+          DB_PASSWORD: testpass
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
