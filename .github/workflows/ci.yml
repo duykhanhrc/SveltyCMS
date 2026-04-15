@@ -329,6 +329,7 @@ jobs:
           DB_NAME: sveltycms_test
           DB_USER: testuser
           DB_PASSWORD: testpass
+          JWT_SECRET_KEY: ci-test-jwt-secret-key-for-e2e-runs
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
@@ -385,6 +386,7 @@ jobs:
           DB_NAME: sveltycms_test
           DB_USER: testuser
           DB_PASSWORD: testpass
+          JWT_SECRET_KEY: ci-test-jwt-secret-key-for-e2e-runs
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
@@ -453,6 +455,7 @@ jobs:
           DB_NAME: sveltycms_test
           DB_USER: testuser
           DB_PASSWORD: testpass
+          JWT_SECRET_KEY: ci-test-jwt-secret-key-for-e2e-runs
           TEST_MODE: true
           ADMIN_PASSWORD: Password123!
           PLAYWRIGHT_TEST_BASE_URL: http://127.0.0.1:4173
