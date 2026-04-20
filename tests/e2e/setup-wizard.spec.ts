@@ -87,7 +87,7 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   // test.setTimeout(180_000);
 
   // 1. Start at root, expect redirect to /setup
-  await page.goto("/setup", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "networkidle" });
   await page.waitForLoadState("networkidle");
 
   const currentUrl = page.url();

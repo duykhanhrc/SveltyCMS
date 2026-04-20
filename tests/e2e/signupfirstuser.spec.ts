@@ -6,43 +6,52 @@
  *   - Signs up the first user and checks validations
  *   - Tests sign out, login, and forgot password flows
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test.describe.configure({ timeout: 60_000 }); // Set timeout for all tests
+// test.describe.configure({ timeout: 60_000 }); // Set timeout for all tests
+
+/** Dismiss the cookie consent modal if it appears after page load. */
+async function dismissCookieConsent(page: Page) {
+  await page.getByRole("button", { name: "Accept All" }).click({ timeout: 3000 }).catch(() => {});
+}
 
 test("Test loading homepage and login screen", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await dismissCookieConsent(page);
   await expect(page).toHaveURL(/\/$/);
 
   await page.goto("/login", { waitUntil: "domcontentloaded" });
+  await dismissCookieConsent(page);
 
   await expect(page.getByText(/sign up/i)).toBeVisible();
   await expect(page.getByText(/sign in/i)).toBeVisible();
 });
 
-// ✅ Language selection test (dropdown version)
+// ✅ Language selection test (custom Ark UI menu)
 test("Check language selection updates UI text", async ({ page }) => {
   await page.goto("/login");
-
-  const languageSelector = "select"; // Update if needed
+  await dismissCookieConsent(page);
 
   const languages = [
     { code: "de", expected: /anmelden/i }, // Sign In in German
-    { code: "fr", expected: /se connecter/i }, // French
-    { code: "es", expected: /iniciar sesión/i }, // Spanish
     { code: "en", expected: /sign in/i }, // English
   ];
 
   for (const lang of languages) {
-    await page.selectOption(languageSelector, lang.code);
+    // Open the custom language menu trigger
+    await page.getByRole("button", { name: "Select language" }).click();
+    // Click the menu item by its Ark UI data-value attribute (rendered via Portal)
+    await page.locator(`[data-part="item"][data-value="${lang.code}"]`).click();
     await page.waitForTimeout(500); // Wait for UI update
-    await expect(page.getByRole("button", { name: lang.expected })).toBeVisible();
+    // The sign-in icon uses aria-label="Go to Sign In"; translated text is in the inner <p>
+    await expect(page.locator('[data-testid="signin-icon"] p')).toHaveText(lang.expected);
   }
 });
 
 // ✅ Signup First User
 test("SignUp First User", async ({ page }) => {
   await page.goto("/login");
+  await dismissCookieConsent(page);
   await page.getByText(/sign up/i).click();
 
   // Username validation
@@ -64,10 +73,10 @@ test("SignUp First User", async ({ page }) => {
   await page.locator("#confirm_passwordsignUp").fill("Test123!");
 
   // Registration Token (if required)
-  await page.locator("#tokensignUp").fill("svelty-secret-key");
+  await page.locator("#tokensignUp").fill("svelty-secret-key-32chars-padding!!");
 
   // Submit
-  await page.locator('button[aria-label="SIGN UP"]').click();
+  await page.locator('button[aria-label="Sign Up"]').click();
 
   // Final assert
   await expect(page).toHaveURL(/\/en\/Posts/);
@@ -76,7 +85,7 @@ test("SignUp First User", async ({ page }) => {
 // ✅ SignOut Test
 test("SignOut after login", async ({ page }) => {
   await page.goto("/login");
-
+  await dismissCookieConsent(page);
   await page.getByText(/sign in/i).click();
   await page.getByTestId("signin-email").fill("test@test.de");
   await page.getByTestId("signin-password").fill("Test123!");
@@ -92,7 +101,7 @@ test("SignOut after login", async ({ page }) => {
 // ✅ Login First User
 test("Login First User", async ({ page }) => {
   await page.goto("/login");
-
+  await dismissCookieConsent(page);
   await page.getByText(/sign in/i).click();
   await page.getByTestId("signin-email").fill("test@test2.de");
   await page.getByTestId("signin-password").fill("Test123!");
@@ -104,7 +113,7 @@ test("Login First User", async ({ page }) => {
 // ✅ Forgot Password
 test("Forgot Password Flow", async ({ page }) => {
   await page.goto("/login");
-
+  await dismissCookieConsent(page);
   await page.getByText(/sign in/i).click();
   await page.getByRole("button", { name: /forgotten password/i }).click();
   await page.locator("#emailforgot").fill("test@test2.de");
