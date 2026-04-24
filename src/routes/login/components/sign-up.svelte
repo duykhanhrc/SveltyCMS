@@ -1,4 +1,4 @@
-﻿<!--
+<!--
 @file src/routes/login/components/SignUp.svelte
 @component
 **SignUP with optional OAuth support**
@@ -217,6 +217,20 @@ function handleOAuth() {
 	const form = document.createElement("form");
 	form.method = "post";
 
+	// Add CSRF token for security validation
+	const csrfInput = document.createElement("input");
+	csrfInput.type = "hidden";
+	csrfInput.name = "__sveltekit_csrf_token"; // Standard SvelteKit name or matching custom hook
+	csrfInput.value = page.data.csrfToken || "";
+	form.appendChild(csrfInput);
+
+	// Also add X-CSRF-Token if hook expects it in body (some custom implementations do)
+	const xCsrfInput = document.createElement("input");
+	xCsrfInput.type = "hidden";
+	xCsrfInput.name = "X-CSRF-Token";
+	xCsrfInput.value = page.data.csrfToken || "";
+	form.appendChild(xCsrfInput);
+
 	// Use signInOAuth action when in invite flow to preserve invite token
 	if (isInviteFlow && token) {
 		// Build the action URL with the invite token as a query parameter
@@ -433,7 +447,7 @@ $effect(() => {
 							bind:value={signUpForm.data.token}
 							label="{registration_token()} (Optional)"
 							minlength={32}
-							maxlength={36}
+							maxlength={64}
 							icon="mdi:key-chain"
 							iconColor="white"
 							textColor="white"

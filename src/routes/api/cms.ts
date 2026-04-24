@@ -247,13 +247,13 @@ class AuthNamespace {
 
   async validateToken(
     token: string,
-    type: "session" | "invitation" | "reset" | "api" = "api",
-    category: string = "general",
+    userId?: DatabaseId,
+    type = "access",
     options: { tenantId?: DatabaseId | null } = {},
   ) {
     const auth = await this.getAuth();
     if (!auth) throw new AppError("Authentication system not initialized", 500);
-    return auth.validateToken(token, type as any, category, {
+    return auth.validateToken(token, userId, type, {
       tenantId: options.tenantId as DatabaseId,
     });
   }
@@ -617,6 +617,12 @@ class TokensNamespace {
     return withTenant(
       tenantId ?? null,
       async () => {
+        // Handle expiresInHours conversion if present
+        if (data && data.expiresInHours) {
+          data.expires = new Date(Date.now() + data.expiresInHours * 60 * 60 * 1000).toISOString();
+          delete data.expiresInHours;
+        }
+
         const existing = await this._dbAdapter.crud.findOne("tokens", { token: tokenId } as any, {
           tenantId: tenantId as DatabaseId,
         });
@@ -677,11 +683,20 @@ class TokensNamespace {
           case "1 week":
             expiresDate = new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString();
             break;
+          case "2 weeks":
+            expiresDate = new Date(now + 14 * 24 * 60 * 60 * 1000).toISOString();
+            break;
           case "1 month":
             expiresDate = new Date(now + 30 * 24 * 60 * 60 * 1000).toISOString();
             break;
           default:
-            expiresDate = expires;
+            // Check if it's already a valid date string
+            if (expires && !isNaN(Date.parse(expires))) {
+              expiresDate = new Date(expires).toISOString();
+            } else {
+              // Fallback to default 2 days
+              expiresDate = new Date(now + 2 * 24 * 60 * 60 * 1000).toISOString();
+            }
         }
 
         const result = await this._dbAdapter.crud.insert(

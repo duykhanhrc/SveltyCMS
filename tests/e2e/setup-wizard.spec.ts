@@ -84,11 +84,11 @@ test.beforeEach(async ({ page }) => {
 
 test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   // Setup wizard can take time due to DB initialization/seeding
-  // test.setTimeout(180_000);
+  test.setTimeout(180_000);
 
   // 1. Start at root, expect redirect to /setup
-  await page.goto("/", { waitUntil: "networkidle" });
-  await page.waitForLoadState("networkidle");
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("domcontentloaded");
 
   const currentUrl = page.url();
   console.log(`Current URL: ${currentUrl}`);
@@ -96,12 +96,12 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   // If redirected elsewhere (e.g. root without setup), force go to /setup
   if (!currentUrl.includes("/setup")) {
     console.log("Redirected to non-setup page. Forcing navigate to /setup...");
-    await page.goto("/setup", { waitUntil: "networkidle" });
+    await page.goto("/setup", { waitUntil: "domcontentloaded" });
   }
 
   // Wait for setup to load and hydrate
   await expect(page).toHaveURL(/\/setup/);
-  await page.waitForLoadState("networkidle");
+  await page.waitForLoadState("domcontentloaded");
   await page.waitForTimeout(5000); // Hard wait for page to fully render and modals to appear
 
   // Helper: dismiss cookie consent banner if visible
@@ -285,8 +285,14 @@ test("Setup Wizard: Configure DB and Create Admin", async ({ page }) => {
   console.log("Successfully redirected after setup. Current URL:", page.url());
 
   // Navigate to the collection builder to verify setup completed successfully
-  await page.goto("/config/collectionbuilder", { waitUntil: "networkidle" });
+  await page.goto("/config/collectionbuilder", { waitUntil: "domcontentloaded" });
   console.log("Collection builder URL:", page.url());
+
+  // Wait for the Collection Builder title to be visible to ensure the page loaded correctly
+  // Use a regex to be language-agnostic if possible, or just the ID/role if it's unique
+  await expect(page.getByRole("heading", { name: /collection builder/i }).first()).toBeVisible({
+    timeout: 30000,
+  });
   await expect(page).not.toHaveURL(/\/setup/);
   console.log("Setup completed successfully.");
 });

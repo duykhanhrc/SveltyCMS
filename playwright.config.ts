@@ -129,7 +129,7 @@ export default defineConfig({
     : {
         webServer: {
           command: `TEST_API_SECRET=${TEST_API_SECRET} bun run preview`,
-          port: 4173,
+          port: 5173,
           timeout: 300_000,
           reuseExistingServer: true,
         },

@@ -98,7 +98,7 @@ export async function handleIdentityTokenRoutes(
     }
 
     // If not found by technical ID, check if it's an invitation token value being validated
-    const validateRes = await cms.auth.validateToken(tokenId as string, "invitation", "general", {
+    const validateRes = await cms.auth.validateToken(tokenId as string, undefined, "invitation", {
       tenantId,
     });
     if (validateRes.success && validateRes.data?.success) {
@@ -113,21 +113,64 @@ export async function handleIdentityTokenRoutes(
 
   if ((request.method === "PATCH" || request.method === "PUT") && method) {
     const body = await request.json();
-    const result = await cms.auth.tokens.update(method, body, tenantId);
+    const updateData = body.newTokenData || body;
+    const result = await cms.auth.tokens.update(method, updateData, tenantId);
     if (!result) throw new AppError("Token not found", 404);
     return successResponse(event, result);
   }
 
   if (request.method === "POST") {
     const body = await request.json();
-    if (method === "create-token") {
+    if (method === "create-token" || method === "createToken") {
       if (body.expiresIn && !body.expires) body.expires = body.expiresIn;
       const result = await cms.auth.tokens.create({ ...body, userId: locals.user?._id, tenantId });
       if (!result.success) throw new AppError(result.message || "Failed to create token", 400);
-      const tokenValue = result.data;
+
+      const tokenValue = result.data as string;
+      let emailSent = false;
+      let smtpNotConfigured = false;
+      let devMode = false;
+
+      // Send email if requested
+      if (body.email) {
+        try {
+          const origin = url.origin;
+          const tokenLink = `${origin}/login?invite_token=${tokenValue}`;
+
+          const mailResult = await cms.system.sendMail({
+            recipientEmail: body.email,
+            subject: "Invitation to join SveltyCMS",
+            templateName: "user-token",
+            props: {
+              email: body.email,
+              role: body.role || "user",
+              token: tokenValue,
+              tokenLink,
+              expiresInLabel: body.expiresIn || "2 days",
+            },
+          });
+
+          if (mailResult.success) {
+            emailSent = true;
+            if ((mailResult as any).dev_mode) devMode = true;
+          } else if ((mailResult as any).missing_config) {
+            smtpNotConfigured = true;
+          }
+        } catch (err) {
+          // Log error but don't fail the token creation
+          console.error("Failed to send invitation email:", err);
+        }
+      }
+
       return rawResponse(
         event,
-        { success: true, token: { value: tokenValue, token: tokenValue } },
+        {
+          success: true,
+          token: { value: tokenValue, token: tokenValue },
+          email_sent: emailSent,
+          smtp_not_configured: smtpNotConfigured,
+          dev_mode: devMode,
+        },
         200, // Satisfy legacy test expectation
       );
     }

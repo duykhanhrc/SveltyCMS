@@ -846,6 +846,14 @@ export const actions: Actions = {
       }
       const { user: newUser, session: newSession } = userAndSessionResult.data;
 
+      // Set session cookie to log the user in immediately
+      const sessionCookie = auth.createSessionCookie(newSession._id as DatabaseId);
+      const attributes = sessionCookie.attributes as Record<string, unknown>;
+      event.cookies.set(sessionCookie.name, sessionCookie.value, {
+        ...attributes,
+        path: "/",
+      });
+
       logger.info(
         `User and session created successfully via ${isInvited ? "token" : "open demo"} registration`,
         {

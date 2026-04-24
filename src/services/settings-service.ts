@@ -9,7 +9,8 @@
  * - settings import/export
  */
 
-import { privateConfigSchema, publicConfigSchema } from "@src/databases/schemas";
+import { privateConfigSchema } from "@src/databases/schemas";
+import { publicConfigSchema } from "@src/databases/public-config-schema";
 import { logger } from "@utils/logger";
 import type { InferOutput } from "valibot";
 

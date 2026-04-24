@@ -22,7 +22,7 @@ import { generateCategoryNodesFromPaths } from "@src/content/content-utils";
 import { getAllPermissions } from "@src/databases/auth";
 import { defaultRoles as importedDefaultRoles } from "@src/databases/auth/default-roles";
 import type { DatabaseAdapter, Theme } from "@src/databases/db-interface";
-import { publicConfigSchema } from "@src/databases/schemas";
+import { publicConfigSchema } from "@src/databases/public-config-schema";
 import { invalidateSettingsCache } from "@src/services/settings-service";
 import { dateToISODateString } from "@utils/date-utils";
 import { logger } from "@utils/logger.server";

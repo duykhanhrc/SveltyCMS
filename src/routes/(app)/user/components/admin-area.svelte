@@ -40,6 +40,10 @@
 		return new Date(row.expires) < new Date();
 	}
 
+	// SvelteKit
+	import { page } from '$app/state';
+	import { invalidateAll } from '$app/navigation';
+
 	// Components
 	import { Avatar } from '@skeletonlabs/skeleton-svelte';
 
@@ -449,7 +453,8 @@
 			const response = await fetch('/api/user/batch', {
 				method: 'POST',
 				headers: {
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
+					'X-CSRF-Token': page.data.csrfToken || ''
 				},
 				body: JSON.stringify({
 					userIds: [user._id],
@@ -465,6 +470,7 @@
 					'_id' in item && (item as User)._id === user._id ? { ...item, blocked: !item.blocked } : item
 				);
 				tableData = updatedData;
+				await invalidateAll();
 				toast.success(`User ${actionPastTense} successfully`);
 			} else {
 				throw new Error(result.message || `Failed to ${action} user`);
@@ -507,7 +513,8 @@
 			const response = await fetch('/api/token/batch', {
 				method: 'POST',
 				headers: {
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
+					'X-CSRF-Token': page.data.csrfToken || ''
 				},
 				body: JSON.stringify({
 					tokenIds: [token.token],
@@ -524,6 +531,7 @@
 					return isTokenItem && item.token === token.token ? { ...item, blocked: !item.blocked } : item;
 				});
 				tableData = updatedData;
+				await invalidateAll();
 				toast.success(`Token ${actionPastTense} successfully`);
 			} else {
 				throw new Error(result.message || `Failed to ${action} token`);
@@ -892,7 +900,7 @@
 										{:else if header.key === 'token'}
 											<!-- Token with clipboard functionality -->
 											<div class="flex items-center justify-center gap-2">
-												<span class="max-w-50 truncate font-mono text-sm">{isToken(row) && header.key === 'token' ? row.token : '-'}</span>
+												<span class="max-w-[150px] sm:max-w-[250px] truncate font-mono text-xs sm:text-sm">{isToken(row) && header.key === 'token' ? row.token : '-'}</span>
 												<SystemTooltip title="Copy Token to clipboard">
 													<button
 														class="preset-ghost btn-icon btn-icon-sm hover:preset-filled-tertiary-500 hover:dark:preset-filled-primary-500"

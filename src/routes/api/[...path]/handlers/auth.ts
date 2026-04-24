@@ -376,15 +376,58 @@ export async function handleTokenRoutes(
   const { request, url } = event;
   const action = segments[1];
 
-  if (action === "create-token" && request.method === "POST") {
+  if ((action === "create-token" || action === "createToken") && request.method === "POST") {
     const body = await request.json();
+    if (body.expiresIn && !body.expires) body.expires = body.expiresIn;
     const result = await cms.auth.tokens.create({
       ...body,
       userId: event.locals.user?._id,
       tenantId,
     });
     if (!result.success) throw new AppError(result.message || "Failed to create token", 400);
-    return rawResponse(event, { success: true, token: result.data });
+
+    const tokenValue = result.data as string;
+    let emailSent = false;
+    let smtpNotConfigured = false;
+    let devMode = false;
+
+    // Send email if requested
+    if (body.email) {
+      try {
+        const origin = url.origin;
+        const tokenLink = `${origin}/login?invite_token=${tokenValue}`;
+
+        const mailResult = await cms.system.sendMail({
+          recipientEmail: body.email,
+          subject: "Invitation to join SveltyCMS",
+          templateName: "user-token",
+          props: {
+            email: body.email,
+            role: body.role || "user",
+            token: tokenValue,
+            tokenLink,
+            expiresInLabel: body.expiresIn || "2 days",
+          },
+        });
+
+        if (mailResult.success) {
+          emailSent = true;
+          if ((mailResult as any).dev_mode) devMode = true;
+        } else if ((mailResult as any).missing_config) {
+          smtpNotConfigured = true;
+        }
+      } catch (err) {
+        console.error("Failed to send invitation email:", err);
+      }
+    }
+
+    return rawResponse(event, {
+      success: true,
+      token: { value: tokenValue, token: tokenValue },
+      email_sent: emailSent,
+      smtp_not_configured: smtpNotConfigured,
+      dev_mode: devMode,
+    });
   }
 
   if (action === "batch" && request.method === "POST") {
@@ -411,20 +454,25 @@ export async function handleTokenRoutes(
   // Assume action is tokenId
   const tokenId = action as DatabaseId;
   if (request.method === "GET") {
-    const result = await cms.auth.validateToken(tokenId as string, "invitation", "general", {
-      tenantId,
-    });
+    const result = await cms.auth.validateToken(
+      tokenId as DatabaseId,
+      "invitation" as any,
+      "general",
+      {
+        tenantId,
+      },
+    );
     if (!result.success) throw new AppError("Token not found or invalid", 404);
     return successResponse(event, { valid: true });
   }
   if (request.method === "PUT") {
     const { newTokenData } = await request.json();
-    const result = await cms.auth.tokens.update(tokenId as string, newTokenData, tenantId);
+    const result = await cms.auth.tokens.update(tokenId as DatabaseId, newTokenData, tenantId);
     if (!result) throw new AppError("Token not found or invalid", 400);
     return successResponse(event, result);
   }
   if (request.method === "DELETE") {
-    const result = await cms.auth.tokens.delete(tokenId as string, tenantId);
+    const result = await cms.auth.tokens.delete(tokenId as DatabaseId, tenantId);
     if (!result.success) throw new AppError(result.message || "Failed to delete token", 400);
     return successResponse(event, { success: true });
   }

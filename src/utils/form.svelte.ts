@@ -123,10 +123,26 @@ export class Form<T extends Record<string, unknown>> {
       }
     }
 
+    // Get CSRF token from SvelteKit page data if available (browser-only)
+    let csrfToken = "";
+    if (typeof window !== "undefined") {
+      try {
+        const { get } = await import("svelte/store");
+        const { page } = await import("$app/stores");
+        const pageData = get(page).data;
+        csrfToken = pageData.csrfToken || "";
+      } catch (e) {
+        // Fallback for non-Svelte contexts or SSR
+      }
+    }
+
     try {
       const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
         ...options,
         body: JSON.stringify(this.data),
       });

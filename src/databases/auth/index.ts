@@ -541,28 +541,33 @@ export class Auth {
     token: string,
     options?: BaseQueryOptions,
   ): Promise<{ isValid: boolean; message: string; details?: Token }> {
-    // Try both 'user-invite' (new) and 'invite' (legacy) types
-    let result = await this.db.auth.validateToken(token, undefined, "user-invite", options);
+    // Try 'invitation' (primary), 'user-invite' (legacy), and 'invite' (legacy) types
+    const typesToTry = ["invitation", "user-invite", "invite"];
+    let result: DatabaseResult<any> | null = null;
 
-    if (!(result?.success && result.data && result.data.success)) {
-      result = await this.db.auth.validateToken(token, undefined, "invite", options);
+    for (const type of typesToTry) {
+      result = await this.db.auth.validateToken(token, undefined, type, options);
+      // Check if success: true is in data (SQLite) or if data exists (MongoDB)
+      if (result?.success && result.data && result.data.success !== false) {
+        break;
+      }
     }
 
-    if (result?.success && result.data && result.data.success) {
-      const tokenResult = await this.db.auth.getTokenByValue(token, options);
-      const tokenDoc = tokenResult?.success ? tokenResult.data : null;
-      return {
-        isValid: true,
-        message: result.data.message,
-        details: tokenDoc ?? undefined,
-      };
+    if (result?.success && result.data && result.data.success !== false) {
+      // Get the full token details to return
+      const tokenRes = await this.db.auth.getTokenByValue(token, options);
+      if (tokenRes.success && tokenRes.data) {
+        return {
+          isValid: true,
+          message: "Token is valid",
+          details: tokenRes.data,
+        };
+      }
     }
+
     return {
       isValid: false,
-      message:
-        !result || result.success
-          ? "Token validation failed"
-          : result.message || "Token validation failed",
+      message: "Invalid, expired, or already consumed registration token",
     };
   }
 
@@ -589,23 +594,27 @@ export class Auth {
     token: string,
     options?: BaseQueryOptions,
   ): Promise<{ status: boolean; message: string }> {
-    // Attempt to consume as 'user-invite' first
-    let result = await this.db.auth.consumeToken(token, undefined, "user-invite", options);
+    // Try 'invitation' (primary), 'user-invite' (legacy), and 'invite' (legacy) types
+    const typesToTry = ["invitation", "user-invite", "invite"];
+    let result: DatabaseResult<any> | null = null;
 
-    // If fails (likely wrong type), try legacy 'invite'
-    if (!(result?.success && result.data && result.data.status)) {
-      result = await this.db.auth.consumeToken(token, undefined, "invite", options);
+    for (const type of typesToTry) {
+      result = await this.db.auth.consumeToken(token, undefined, type, options);
+      // SQLite returns { status: boolean }, MongoDB returns success: true
+      if (result?.success && result.data?.status !== false) {
+        return {
+          status: true,
+          message: "Token consumed successfully",
+        };
+      }
     }
 
-    if (result?.success && result.data) {
-      return result.data;
-    }
     return {
       status: false,
       message:
-        !result || result.success
-          ? "Failed to consume token"
-          : result.message || "Failed to consume token",
+        !result?.success && result?.message
+          ? result.message
+          : "Failed to consume registration token",
     };
   }
 

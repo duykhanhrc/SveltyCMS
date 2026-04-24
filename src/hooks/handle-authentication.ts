@@ -367,6 +367,14 @@ export const handleAuthentication: Handle = async ({ event, resolve }) => {
         locals.user = user;
         locals.session_id = sessionId as DatabaseId;
         locals.permissions = user.permissions || [];
+
+        // --- CSRF PROTECTION ---
+        // Ensure CSRF token exists for state-changing operations
+        const csrfCookieName = isSecure ? "__Host-csrf_token" : "csrf_token";
+        if (!cookies.get(csrfCookieName)) {
+          generateCsrfToken(cookies, isSecure);
+        }
+
         await handleSessionRotation(event, user, sessionId);
       } else {
         metricsService.incrementAuthFailures();
